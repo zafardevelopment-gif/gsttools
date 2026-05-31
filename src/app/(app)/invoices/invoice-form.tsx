@@ -1,0 +1,383 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
+import { createInvoiceAction } from "@/server/actions/invoices";
+import { computeInvoiceTotals, isInterstateSupply } from "@/lib/gst";
+import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/money";
+import { GST_RATES, STATE_CODE_TO_NAME } from "@/lib/constants";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export type PartyOption = {
+  id: string;
+  name: string;
+  type: string;
+  state_code: string | null;
+  gstin: string | null;
+};
+export type ItemOption = {
+  id: string;
+  name: string;
+  hsn_sac: string | null;
+  unit: string;
+  sale_price_paise: number;
+  purchase_price_paise: number;
+  tax_rate: number;
+  type: string;
+};
+
+type Line = {
+  key: number;
+  itemId: string | null;
+  name: string;
+  hsn_sac: string;
+  unit: string;
+  qty: string;
+  rate: string;
+  taxRate: string;
+  discountPercent: string;
+};
+
+let lineSeq = 1;
+const emptyLine = (): Line => ({
+  key: lineSeq++,
+  itemId: null,
+  name: "",
+  hsn_sac: "",
+  unit: "PCS",
+  qty: "1",
+  rate: "",
+  taxRate: "18",
+  discountPercent: "0",
+});
+
+export function InvoiceForm({
+  parties,
+  items,
+  businessStateCode,
+  suggestedNumber,
+}: {
+  parties: PartyOption[];
+  items: ItemOption[];
+  businessStateCode: string;
+  suggestedNumber: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  const [direction, setDirection] = useState<"sale" | "purchase">("sale");
+  const [invoiceType, setInvoiceType] = useState<"gst" | "non_gst">("gst");
+  const [partyId, setPartyId] = useState<string>("");
+  const [invoiceNumber, setInvoiceNumber] = useState(suggestedNumber);
+  const [invoiceDate, setInvoiceDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [dueDate, setDueDate] = useState("");
+  const [additionalCharges, setAdditionalCharges] = useState("0");
+  const [roundOff, setRoundOff] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [terms, setTerms] = useState("");
+  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+
+  const party = parties.find((p) => p.id === partyId);
+  const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;
+  const interstate = isInterstateSupply(businessStateCode, placeOfSupply);
+
+  const totals = useMemo(
+    () =>
+      computeInvoiceTotals({
+        lines: lines.map((l) => ({
+          qty: Number(l.qty) || 0,
+          ratePaise: rupeesToPaise(Number(l.rate) || 0),
+          taxRate: Number(l.taxRate) || 0,
+          discountPercent: Number(l.discountPercent) || 0,
+        })),
+        isInterstate: interstate,
+        invoiceType,
+        additionalChargesPaise: rupeesToPaise(Number(additionalCharges) || 0),
+        roundOff,
+      }),
+    [lines, interstate, invoiceType, additionalCharges, roundOff],
+  );
+
+  function updateLine(key: number, patch: Partial<Line>) {
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  }
+
+  function pickItem(key: number, itemId: string) {
+    const it = items.find((i) => i.id === itemId);
+    if (!it) return;
+    const ratePaise =
+      direction === "purchase" ? it.purchase_price_paise : it.sale_price_paise;
+    updateLine(key, {
+      itemId: it.id,
+      name: it.name,
+      hsn_sac: it.hsn_sac ?? "",
+      unit: it.unit,
+      rate: String(paiseToRupees(ratePaise)),
+      taxRate: String(it.tax_rate),
+    });
+  }
+
+  function submit(status: "draft" | "final") {
+    if (lines.every((l) => !l.name.trim())) {
+      toast.error("Add at least one line item.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await createInvoiceAction({
+        direction,
+        invoiceType,
+        partyId: partyId || null,
+        invoiceNumber: invoiceNumber || undefined,
+        invoiceDate,
+        dueDate: dueDate || null,
+        additionalCharges: Number(additionalCharges) || 0,
+        roundOff,
+        notes,
+        terms,
+        template: "classic",
+        status,
+        lines: lines
+          .filter((l) => l.name.trim())
+          .map((l) => ({
+            itemId: l.itemId,
+            name: l.name,
+            hsn_sac: l.hsn_sac,
+            unit: l.unit,
+            qty: Number(l.qty) || 0,
+            rate: Number(l.rate) || 0,
+            taxRate: Number(l.taxRate) || 0,
+            discountPercent: Number(l.discountPercent) || 0,
+          })),
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Invoice saved.");
+        router.push(`/invoices/${res.id}`);
+      }
+    });
+  }
+
+  const relevantParties = parties.filter((p) =>
+    direction === "purchase"
+      ? p.type === "supplier" || p.type === "both"
+      : p.type === "customer" || p.type === "both",
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <Card>
+        <CardContent className="grid gap-4 pt-6 md:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label>Type</Label>
+            <Select value={direction} onValueChange={(v) => setDirection(v as "sale" | "purchase")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sale">Sales invoice</SelectItem>
+                <SelectItem value="purchase">Purchase bill</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>GST</Label>
+            <Select value={invoiceType} onValueChange={(v) => setInvoiceType(v as "gst" | "non_gst")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="gst">GST invoice</SelectItem>
+                <SelectItem value="non_gst">Non-GST / cash</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{direction === "purchase" ? "Supplier" : "Customer"}</Label>
+            <Select value={partyId} onValueChange={setPartyId}>
+              <SelectTrigger><SelectValue placeholder="Select party" /></SelectTrigger>
+              <SelectContent>
+                {relevantParties.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Invoice number</Label>
+            <Input
+              value={invoiceNumber}
+              placeholder="Auto-generated on save"
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Date</Label>
+            <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Due date</Label>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </div>
+
+          {invoiceType === "gst" && (
+            <div className="md:col-span-3">
+              <Badge variant={interstate ? "default" : "secondary"}>
+                {interstate ? "Inter-state · IGST" : "Intra-state · CGST + SGST"}
+              </Badge>
+              {placeOfSupply && (
+                <span className="ml-2 text-xs text-muted-foreground">
+                  Place of supply: {STATE_CODE_TO_NAME[placeOfSupply] ?? placeOfSupply}
+                </span>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Line items */}
+      <Card>
+        <CardContent className="space-y-3 pt-6">
+          <div className="hidden gap-2 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[1fr_5rem_6rem_4rem_5rem_7rem_2rem]">
+            <span>Item</span><span>Qty</span><span>Rate ₹</span><span>Disc %</span>
+            <span>GST %</span><span className="text-right">Amount</span><span />
+          </div>
+          {lines.map((l, idx) => (
+            <div
+              key={l.key}
+              className="grid grid-cols-2 gap-2 md:grid-cols-[1fr_5rem_6rem_4rem_5rem_7rem_2rem] md:items-center"
+            >
+              <div className="col-span-2 md:col-span-1 space-y-1">
+                {items.length > 0 && (
+                  <Select value={l.itemId ?? ""} onValueChange={(v) => pickItem(l.key, v)}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Pick item or type below" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {items.map((i) => (
+                        <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Input
+                  placeholder="Item name"
+                  value={l.name}
+                  onChange={(e) => updateLine(l.key, { name: e.target.value, itemId: null })}
+                />
+              </div>
+              <Input type="number" step="0.001" min="0" value={l.qty}
+                onChange={(e) => updateLine(l.key, { qty: e.target.value })} />
+              <Input type="number" step="0.01" min="0" value={l.rate}
+                onChange={(e) => updateLine(l.key, { rate: e.target.value })} />
+              <Input type="number" step="0.01" min="0" max="100" value={l.discountPercent}
+                onChange={(e) => updateLine(l.key, { discountPercent: e.target.value })} />
+              <Select value={l.taxRate} onValueChange={(v) => updateLine(l.key, { taxRate: v })}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {GST_RATES.map((r) => (
+                    <SelectItem key={r} value={String(r)}>{r}%</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-right text-sm tabular-nums">
+                {formatINR(totals.lines[idx]?.amountPaise ?? 0)}
+              </div>
+              <Button
+                variant="ghost" size="icon" type="button"
+                onClick={() => setLines((p) => (p.length > 1 ? p.filter((x) => x.key !== l.key) : p))}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" size="sm" type="button" onClick={() => setLines((p) => [...p, emptyLine()])}>
+            <Plus className="size-4" /> Add line
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Totals + meta */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardContent className="space-y-3 pt-6">
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Terms</Label>
+              <Textarea rows={2} value={terms} onChange={(e) => setTerms(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Additional charges ₹</Label>
+                <Input type="number" step="0.01" min="0" value={additionalCharges}
+                  onChange={(e) => setAdditionalCharges(e.target.value)} />
+              </div>
+              <label className="flex items-end gap-2 pb-2 text-sm">
+                <input type="checkbox" checked={roundOff} onChange={(e) => setRoundOff(e.target.checked)} />
+                Round off total
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="space-y-2 pt-6 text-sm">
+            <Row label="Taxable value" value={formatINR(totals.taxableValuePaise)} />
+            {totals.discountPaise > 0 && (
+              <Row label="Discount" value={`- ${formatINR(totals.discountPaise)}`} />
+            )}
+            {interstate ? (
+              <Row label="IGST" value={formatINR(totals.igstPaise)} />
+            ) : (
+              <>
+                <Row label="CGST" value={formatINR(totals.cgstPaise)} />
+                <Row label="SGST" value={formatINR(totals.sgstPaise)} />
+              </>
+            )}
+            {totals.additionalChargesPaise > 0 && (
+              <Row label="Additional charges" value={formatINR(totals.additionalChargesPaise)} />
+            )}
+            {totals.roundOffPaise !== 0 && (
+              <Row label="Round off" value={formatINR(totals.roundOffPaise)} />
+            )}
+            <div className="flex justify-between border-t pt-2 text-base font-semibold">
+              <span>Total</span>
+              <span>{formatINR(totals.totalPaise)}</span>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button onClick={() => submit("final")} disabled={pending}>
+                {pending ? "Saving…" : "Save invoice"}
+              </Button>
+              <Button variant="outline" onClick={() => submit("draft")} disabled={pending}>
+                Save as draft
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="tabular-nums">{value}</span>
+    </div>
+  );
+}
