@@ -11,6 +11,7 @@ import {
   type GstLineInput,
 } from "@/lib/gst";
 import { rupeesToPaise } from "@/lib/money";
+import { canCreateInvoice } from "@/server/gating";
 
 export type CreateInvoiceResult = { id?: string; error?: string };
 
@@ -30,6 +31,11 @@ export async function createInvoiceAction(
   const v = parsed.data;
 
   const { tenantId, userId } = await requireActiveContext();
+
+  // Plan gating: block when trial/subscription expired or over the monthly cap.
+  const gate = await canCreateInvoice(v.status === "draft");
+  if (!gate.ok) return { error: gate.error };
+
   const supabase = await createClient();
 
   // Business state (origin of supply).
