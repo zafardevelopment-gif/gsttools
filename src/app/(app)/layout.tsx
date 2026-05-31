@@ -12,7 +12,7 @@ export default async function AppLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex h-14 items-center justify-between border-b px-4">
+      <header className="flex h-14 items-center justify-between border-b px-4 print:hidden">
         <div className="flex items-center gap-3">
           <span className="font-bold tracking-tight">GST Billing</span>
           <TenantSwitcher tenants={ctx.tenants} activeTenantId={ctx.tenantId} />

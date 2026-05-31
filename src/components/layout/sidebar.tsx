@@ -9,7 +9,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-56 shrink-0 border-r bg-muted/30 md:block">
+    <aside className="hidden w-56 shrink-0 border-r bg-muted/30 md:block print:hidden">
       <nav className="flex flex-col gap-1 p-3">
         {NAV_ITEMS.map((item) => {
           const active =
