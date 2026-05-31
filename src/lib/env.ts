@@ -50,6 +50,8 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
   RAZORPAY_KEY_ID: z.string().optional().default(""),
   RAZORPAY_KEY_SECRET: z.string().optional().default(""),
+  /** Comma-separated emails allowed into the internal super-admin panel. */
+  SUPERADMIN_EMAILS: z.string().optional().default(""),
 });
 
 export function getServerEnv() {
@@ -60,5 +62,6 @@ export function getServerEnv() {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
+    SUPERADMIN_EMAILS: process.env.SUPERADMIN_EMAILS,
   });
 }

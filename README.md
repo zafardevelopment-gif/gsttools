@@ -117,8 +117,20 @@ supabase/
   seed/                   # demo tenant + sample data
 ```
 
-## Deploy (Step 11 covers this in detail)
+## Super-admin panel
 
+`/admin` is an internal cross-tenant view (all businesses, plans, subscription
+status, lifetime sales). It uses the service-role client (bypasses RLS) and is
+gated by the `SUPERADMIN_EMAILS` allow-list. A super admin doesn't need to
+belong to any tenant; they open `/admin` directly.
+
+## Deploy
+
+See **[DEPLOY.md](DEPLOY.md)** for the full Vercel + Supabase walkthrough
+(migrations, phone OTP/SMS provider, storage, env vars, Razorpay go-live,
+post-deploy checklist).
+
+Quick version:
 - **App:** Vercel — import the repo, set the env vars from `.env.example`.
 - **DB/Auth:** Supabase hosted project; run migrations via `supabase db push`.
 - Set `NEXT_PUBLIC_SITE_URL` to the production URL and add it to Supabase Auth
