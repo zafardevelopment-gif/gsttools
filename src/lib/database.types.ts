@@ -19,7 +19,7 @@ export type Json =
 type Timestamps = { created_at: string; updated_at: string };
 
 // ---- Row shapes -------------------------------------------------------------
-export interface TenantRow extends Timestamps {
+export type TenantRow = Timestamps & {
   id: string;
   name: string;
   legal_name: string | null;
@@ -37,14 +37,14 @@ export interface TenantRow extends Timestamps {
   invoice_prefix: string;
 }
 
-export interface MembershipRow extends Timestamps {
+export type MembershipRow = Timestamps & {
   id: string;
   tenant_id: string;
   user_id: string;
   role: "owner" | "admin" | "staff";
 }
 
-export interface SubscriptionRow extends Timestamps {
+export type SubscriptionRow = Timestamps & {
   id: string;
   tenant_id: string;
   plan: "trial" | "silver" | "gold" | "diamond";
@@ -56,7 +56,7 @@ export interface SubscriptionRow extends Timestamps {
   razorpay_subscription_id: string | null;
 }
 
-export interface PartyRow extends Timestamps {
+export type PartyRow = Timestamps & {
   id: string;
   tenant_id: string;
   type: "customer" | "supplier" | "both";
@@ -73,7 +73,7 @@ export interface PartyRow extends Timestamps {
   is_active: boolean;
 }
 
-export interface ItemRow extends Timestamps {
+export type ItemRow = Timestamps & {
   id: string;
   tenant_id: string;
   type: "product" | "service";
@@ -91,7 +91,7 @@ export interface ItemRow extends Timestamps {
   is_active: boolean;
 }
 
-export interface InvoiceRow extends Timestamps {
+export type InvoiceRow = Timestamps & {
   id: string;
   tenant_id: string;
   party_id: string | null;
@@ -120,7 +120,7 @@ export interface InvoiceRow extends Timestamps {
   created_by: string | null;
 }
 
-export interface InvoiceItemRow {
+export type InvoiceItemRow = {
   id: string;
   tenant_id: string;
   invoice_id: string;
@@ -142,7 +142,7 @@ export interface InvoiceItemRow {
   created_at: string;
 }
 
-export interface PaymentRow extends Timestamps {
+export type PaymentRow = Timestamps & {
   id: string;
   tenant_id: string;
   party_id: string | null;
@@ -156,7 +156,7 @@ export interface PaymentRow extends Timestamps {
   created_by: string | null;
 }
 
-export interface ExpenseRow extends Timestamps {
+export type ExpenseRow = Timestamps & {
   id: string;
   tenant_id: string;
   category: string;
@@ -168,7 +168,7 @@ export interface ExpenseRow extends Timestamps {
   created_by: string | null;
 }
 
-export interface StockMovementRow {
+export type StockMovementRow = {
   id: string;
   tenant_id: string;
   item_id: string;
@@ -181,7 +181,7 @@ export interface StockMovementRow {
   created_at: string;
 }
 
-export interface AuditLogRow {
+export type AuditLogRow = {
   id: string;
   tenant_id: string;
   user_id: string | null;
@@ -197,7 +197,13 @@ type Generated = "id" | "created_at" | "updated_at";
 type Insert<T, ReqKeep extends keyof T = never> = Partial<Omit<T, Generated>> &
   Pick<T, ReqKeep>;
 
-type TableDef<Row, Ins, Upd> = { Row: Row; Insert: Ins; Update: Upd };
+// `Relationships: []` is required for supabase-js to recognise the table type.
+type TableDef<Row, Ins, Upd> = {
+  Row: Row;
+  Insert: Ins;
+  Update: Upd;
+  Relationships: [];
+};
 
 export type Database = {
   public: {

@@ -43,11 +43,9 @@ export async function getActiveContext(): Promise<ActiveContext | null> {
   if (!memberships || memberships.length === 0) return null;
 
   const chosen =
-    memberships.find((m) => (m as { tenant_id: string }).tenant_id === requested) ??
-    memberships[0];
+    memberships.find((m) => m.tenant_id === requested) ?? memberships[0];
 
-  const m = chosen as { tenant_id: string; role: string };
-  return { userId: user.id, tenantId: m.tenant_id, role: m.role };
+  return { userId: user.id, tenantId: chosen.tenant_id, role: chosen.role };
 }
 
 /** Throws if there is no active tenant context (use in actions/pages that require it). */
