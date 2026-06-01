@@ -1,9 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
-import { devSignIn } from "@/server/actions/auth";
+import { Suspense, useActionState } from "react";
+import { devSignIn, type DevSignInState } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,40 +26,10 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const router = useRouter();
-  const params = useSearchParams();
-  const next = params.get("next") ?? "/dashboard";
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim() || !password) {
-      toast.error("Enter email and password.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const fd = new FormData();
-      fd.set("email", email);
-      fd.set("password", password);
-      // On success the server action redirects; only returns here on error.
-      const res = await devSignIn(fd);
-      if (res?.error) {
-        toast.error(res.error);
-        setLoading(false);
-        return;
-      }
-      // Fallback navigation in case the action returned without redirecting.
-      router.push(next);
-      router.refresh();
-    } catch {
-      toast.error("Could not sign in.");
-      setLoading(false);
-    }
-  }
+  const [state, formAction, pending] = useActionState<DevSignInState, FormData>(
+    devSignIn,
+    {},
+  );
 
   return (
     <Card className="w-full max-w-sm">
@@ -70,17 +38,17 @@ function LoginForm() {
         <CardDescription>Sign in with your email and password.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form action={formAction} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">Email address</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               autoComplete="username"
               placeholder="admin@gst.local"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
+              required
+              disabled={pending}
             />
           </div>
 
@@ -88,17 +56,23 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               autoComplete="current-password"
               placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
+              required
+              disabled={pending}
             />
           </div>
 
-          <Button className="w-full" type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Log in"}
+          {state?.error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {state.error}
+            </p>
+          )}
+
+          <Button className="w-full" type="submit" disabled={pending}>
+            {pending ? "Signing in…" : "Log in"}
           </Button>
         </form>
       </CardContent>

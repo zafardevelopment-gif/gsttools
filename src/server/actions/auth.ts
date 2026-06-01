@@ -12,12 +12,19 @@ import { DEV_AUTH_COOKIE } from "@/lib/auth";
 const DEV_EMAIL = process.env.DEV_AUTH_EMAIL ?? "admin@gst.local";
 const DEV_PASSWORD = process.env.DEV_AUTH_PASSWORD ?? "admin123";
 
+export type DevSignInState = { error?: string };
+
 /**
  * Local email+password sign-in for dev mode (NEXT_PUBLIC_AUTH_DISABLED=true).
- * No Supabase Auth / email — just checks the configured credentials and sets a
- * cookie. Returns { error } on failure; redirects to /dashboard on success.
+ * No Supabase Auth / email — just checks the configured credentials, sets the
+ * dev-auth cookie, and redirects to /dashboard. Designed for useActionState:
+ * returns { error } on failure, and never throws on the happy path (the
+ * NEXT_REDIRECT control-flow signal is re-thrown so Next can handle it).
  */
-export async function devSignIn(formData: FormData) {
+export async function devSignIn(
+  _prev: DevSignInState,
+  formData: FormData,
+): Promise<DevSignInState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -31,12 +38,13 @@ export async function devSignIn(formData: FormData) {
   const cookieStore = await cookies();
   cookieStore.set(DEV_AUTH_COOKIE, "1", {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
-  // Client navigates on success (cookie is already set on this response).
-  return { ok: true as const };
+
+  redirect("/dashboard");
 }
 
 /** Sign the user out and return to the login page. */
