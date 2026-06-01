@@ -11,6 +11,7 @@
  */
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { authDisabled, DEMO_TENANT_ID } from "@/lib/env";
 
 export const ACTIVE_TENANT_COOKIE = "gst_active_tenant";
 
@@ -25,6 +26,15 @@ export type ActiveContext = {
  * user is not authenticated or has no membership.
  */
 export async function getActiveContext(): Promise<ActiveContext | null> {
+  // Dev mode: skip the auth/membership lookup and operate on the demo tenant.
+  if (authDisabled) {
+    return {
+      userId: null as unknown as string,
+      tenantId: DEMO_TENANT_ID,
+      role: "owner",
+    };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

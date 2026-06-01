@@ -9,7 +9,7 @@
 --   direction: 'sale' (customer invoice) or 'purchase' (supplier bill) — lets
 --   one table feed both the sales and purchase reports.
 -- -----------------------------------------------------------------------------
-create table public."GST_invoices" (
+create table if not exists public."GST_invoices" (
   id                       uuid primary key default gen_random_uuid(),
   tenant_id                uuid not null references public."GST_tenants"(id) on delete cascade,
   party_id                 uuid references public."GST_parties"(id) on delete restrict,
@@ -48,11 +48,12 @@ create table public."GST_invoices" (
   unique (tenant_id, direction, invoice_number)
 );
 
-create index idx_invoices_tenant on public."GST_invoices"(tenant_id);
-create index idx_invoices_party on public."GST_invoices"(party_id);
-create index idx_invoices_tenant_date on public."GST_invoices"(tenant_id, invoice_date);
-create index idx_invoices_tenant_status on public."GST_invoices"(tenant_id, status);
+create index if not exists idx_invoices_tenant on public."GST_invoices"(tenant_id);
+create index if not exists idx_invoices_party on public."GST_invoices"(party_id);
+create index if not exists idx_invoices_tenant_date on public."GST_invoices"(tenant_id, invoice_date);
+create index if not exists idx_invoices_tenant_status on public."GST_invoices"(tenant_id, status);
 
+drop trigger if exists trg_invoices_updated_at on public."GST_invoices";
 create trigger trg_invoices_updated_at
   before update on public."GST_invoices"
   for each row execute function public.gst_set_updated_at();
@@ -60,7 +61,7 @@ create trigger trg_invoices_updated_at
 -- -----------------------------------------------------------------------------
 -- GST_invoice_items — line items (snapshots, so edits to masters don't rewrite history)
 -- -----------------------------------------------------------------------------
-create table public."GST_invoice_items" (
+create table if not exists public."GST_invoice_items" (
   id                  uuid primary key default gen_random_uuid(),
   tenant_id           uuid not null references public."GST_tenants"(id) on delete cascade,
   invoice_id          uuid not null references public."GST_invoices"(id) on delete cascade,
@@ -82,13 +83,13 @@ create table public."GST_invoice_items" (
   created_at          timestamptz not null default now()
 );
 
-create index idx_invoice_items_invoice on public."GST_invoice_items"(invoice_id);
-create index idx_invoice_items_tenant on public."GST_invoice_items"(tenant_id);
+create index if not exists idx_invoice_items_invoice on public."GST_invoice_items"(invoice_id);
+create index if not exists idx_invoice_items_tenant on public."GST_invoice_items"(tenant_id);
 
 -- -----------------------------------------------------------------------------
 -- GST_payments — money received (in) or paid (out), optionally against an invoice
 -- -----------------------------------------------------------------------------
-create table public."GST_payments" (
+create table if not exists public."GST_payments" (
   id           uuid primary key default gen_random_uuid(),
   tenant_id    uuid not null references public."GST_tenants"(id) on delete cascade,
   party_id     uuid references public."GST_parties"(id) on delete restrict,
@@ -105,11 +106,12 @@ create table public."GST_payments" (
   updated_at   timestamptz not null default now()
 );
 
-create index idx_payments_tenant on public."GST_payments"(tenant_id);
-create index idx_payments_party on public."GST_payments"(party_id);
-create index idx_payments_invoice on public."GST_payments"(invoice_id);
-create index idx_payments_tenant_date on public."GST_payments"(tenant_id, payment_date);
+create index if not exists idx_payments_tenant on public."GST_payments"(tenant_id);
+create index if not exists idx_payments_party on public."GST_payments"(party_id);
+create index if not exists idx_payments_invoice on public."GST_payments"(invoice_id);
+create index if not exists idx_payments_tenant_date on public."GST_payments"(tenant_id, payment_date);
 
+drop trigger if exists trg_payments_updated_at on public."GST_payments";
 create trigger trg_payments_updated_at
   before update on public."GST_payments"
   for each row execute function public.gst_set_updated_at();
@@ -117,7 +119,7 @@ create trigger trg_payments_updated_at
 -- -----------------------------------------------------------------------------
 -- GST_expenses
 -- -----------------------------------------------------------------------------
-create table public."GST_expenses" (
+create table if not exists public."GST_expenses" (
   id           uuid primary key default gen_random_uuid(),
   tenant_id    uuid not null references public."GST_tenants"(id) on delete cascade,
   category     text not null default 'Miscellaneous',
@@ -132,10 +134,11 @@ create table public."GST_expenses" (
   updated_at   timestamptz not null default now()
 );
 
-create index idx_expenses_tenant on public."GST_expenses"(tenant_id);
-create index idx_expenses_tenant_date on public."GST_expenses"(tenant_id, expense_date);
-create index idx_expenses_category on public."GST_expenses"(tenant_id, category);
+create index if not exists idx_expenses_tenant on public."GST_expenses"(tenant_id);
+create index if not exists idx_expenses_tenant_date on public."GST_expenses"(tenant_id, expense_date);
+create index if not exists idx_expenses_category on public."GST_expenses"(tenant_id, category);
 
+drop trigger if exists trg_expenses_updated_at on public."GST_expenses";
 create trigger trg_expenses_updated_at
   before update on public."GST_expenses"
   for each row execute function public.gst_set_updated_at();
@@ -144,7 +147,7 @@ create trigger trg_expenses_updated_at
 -- GST_stock_movements — append-only ledger of stock changes.
 -- qty_delta is signed: +in (purchase/return), -out (sale).
 -- -----------------------------------------------------------------------------
-create table public."GST_stock_movements" (
+create table if not exists public."GST_stock_movements" (
   id             uuid primary key default gen_random_uuid(),
   tenant_id      uuid not null references public."GST_tenants"(id) on delete cascade,
   item_id        uuid not null references public."GST_items"(id) on delete cascade,
@@ -158,8 +161,8 @@ create table public."GST_stock_movements" (
   created_at     timestamptz not null default now()
 );
 
-create index idx_stock_movements_tenant on public."GST_stock_movements"(tenant_id);
-create index idx_stock_movements_item on public."GST_stock_movements"(item_id);
+create index if not exists idx_stock_movements_tenant on public."GST_stock_movements"(tenant_id);
+create index if not exists idx_stock_movements_item on public."GST_stock_movements"(item_id);
 
 -- =============================================================================
 -- Triggers: keep derived state (stock, party balance, invoice paid) consistent
@@ -180,6 +183,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_apply_stock_movement on public."GST_stock_movements";
 create trigger trg_apply_stock_movement
   after insert on public."GST_stock_movements"
   for each row execute function public.gst_apply_stock_movement();
@@ -282,9 +286,15 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_after_invoice_change on public."GST_invoices";
+-- pg_trigger_depth() = 0 guard: gst_recompute_invoice_payment() writes back to
+-- GST_invoices (amount_paid_paise/status). Without this guard that self-UPDATE
+-- re-fires this trigger, recursing until "stack depth limit exceeded".
 create trigger trg_after_invoice_change
   after insert or update or delete on public."GST_invoices"
-  for each row execute function public.gst_after_invoice_change();
+  for each row
+  when (pg_trigger_depth() = 0)
+  execute function public.gst_after_invoice_change();
 
 create or replace function public.gst_after_payment_change()
 returns trigger
@@ -299,6 +309,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_after_payment_change on public."GST_payments";
 create trigger trg_after_payment_change
   after insert or update or delete on public."GST_payments"
   for each row execute function public.gst_after_payment_change();
@@ -312,22 +323,27 @@ alter table public."GST_payments"        enable row level security;
 alter table public."GST_expenses"        enable row level security;
 alter table public."GST_stock_movements" enable row level security;
 
+drop policy if exists invoices_all on public."GST_invoices";
 create policy invoices_all on public."GST_invoices"
   for all using (public.is_tenant_member(tenant_id))
   with check (public.is_tenant_member(tenant_id));
 
+drop policy if exists invoice_items_all on public."GST_invoice_items";
 create policy invoice_items_all on public."GST_invoice_items"
   for all using (public.is_tenant_member(tenant_id))
   with check (public.is_tenant_member(tenant_id));
 
+drop policy if exists payments_all on public."GST_payments";
 create policy payments_all on public."GST_payments"
   for all using (public.is_tenant_member(tenant_id))
   with check (public.is_tenant_member(tenant_id));
 
+drop policy if exists expenses_all on public."GST_expenses";
 create policy expenses_all on public."GST_expenses"
   for all using (public.is_tenant_member(tenant_id))
   with check (public.is_tenant_member(tenant_id));
 
+drop policy if exists stock_movements_all on public."GST_stock_movements";
 create policy stock_movements_all on public."GST_stock_movements"
   for all using (public.is_tenant_member(tenant_id))
   with check (public.is_tenant_member(tenant_id));

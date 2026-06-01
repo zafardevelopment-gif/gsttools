@@ -1,6 +1,7 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth";
+import { authDisabled } from "@/lib/env";
 import type { TenantRow } from "@/lib/database.types";
 
 export type AppContext = {
@@ -19,6 +20,26 @@ export type AppContext = {
  */
 export async function getAppContext(): Promise<AppContext> {
   const { user, userId, tenantId, role } = await requireTenant();
+
+  // Dev mode: no Supabase auth session, so RLS would return nothing. Load the
+  // demo tenant directly with the service client so the shell has a tenant.
+  if (authDisabled) {
+    const svc = createAdminClient();
+    const { data: tenant } = await svc
+      .from("GST_tenants")
+      .select("*")
+      .eq("id", tenantId)
+      .maybeSingle();
+    return {
+      userId,
+      tenantId,
+      role,
+      userLabel: user.phone || user.email || "Demo",
+      activeTenant: tenant as TenantRow,
+      tenants: tenant ? [{ tenantId: tenant.id, name: tenant.name }] : [],
+    };
+  }
+
   const supabase = await createClient();
 
   // Businesses this user belongs to (RLS scopes to their own memberships).

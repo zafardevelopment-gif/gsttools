@@ -28,6 +28,16 @@ const parsedPublic = publicSchema.safeParse({
 
 export const isSupabaseConfigured = parsedPublic.success;
 
+// -----------------------------------------------------------------------------
+// TEMPORARY dev auth bypass. Set NEXT_PUBLIC_AUTH_DISABLED=true in .env.local to
+// skip login/OTP and run the app as the seeded demo tenant (see DEMO_TENANT_ID).
+// Remove this flag / set it to false once real OTP auth is wired up.
+// -----------------------------------------------------------------------------
+export const authDisabled = process.env.NEXT_PUBLIC_AUTH_DISABLED === "true";
+
+// Fixed UUID of the demo tenant created by supabase/seed/seed.sql.
+export const DEMO_TENANT_ID = "11111111-1111-1111-1111-111111111111";
+
 /** Public env values. Falls back to safe placeholders when not configured. */
 export const publicEnv = parsedPublic.success
   ? parsedPublic.data

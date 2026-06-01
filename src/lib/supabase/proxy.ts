@@ -24,10 +24,21 @@ function isPublic(pathname: string): boolean {
   );
 }
 
+/** Cookie set by the dev email+password login (see server/actions/auth.ts). */
+const DEV_AUTH_COOKIE = "gst_dev_auth";
+
 export async function updateSession(request: NextRequest) {
   // Until Supabase is configured (.env.local), don't gate routes — let the app
   // boot so the landing page and setup docs are reachable.
   if (!isSupabaseConfigured) {
+    return NextResponse.next({ request });
+  }
+
+  // Dev login mode: a present dev-auth cookie means "signed in", so let the
+  // request through (page-level requireTenant resolves the demo tenant). We key
+  // off the cookie rather than the NEXT_PUBLIC_AUTH_DISABLED env flag because
+  // NEXT_PUBLIC_* values are not reliably available in the Edge proxy runtime.
+  if (request.cookies.get(DEV_AUTH_COOKIE)?.value === "1") {
     return NextResponse.next({ request });
   }
 

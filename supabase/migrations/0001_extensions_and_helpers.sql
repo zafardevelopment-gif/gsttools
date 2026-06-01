@@ -12,6 +12,11 @@
 create extension if not exists "pgcrypto";   -- gen_random_uuid()
 create extension if not exists "citext";      -- case-insensitive text (emails)
 
+-- Helper functions below reference GST_memberships, which is created later in
+-- 0002. `language sql` bodies are validated at CREATE time, so we defer that
+-- validation here to allow the forward reference within this migration.
+set check_function_bodies = off;
+
 -- -----------------------------------------------------------------------------
 -- updated_at auto-touch trigger function
 -- -----------------------------------------------------------------------------

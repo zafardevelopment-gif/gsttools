@@ -9,13 +9,30 @@ import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Dashboard · GST Billing" };
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({
+  label,
+  value,
+  sub,
+  accent = "var(--color-chart-1)",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: string;
+}) {
   return (
-    <Card>
+    <Card className="relative overflow-hidden transition-shadow hover:shadow-md">
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ backgroundColor: accent }}
+      />
       <CardContent className="pt-6">
-        <p className="text-xs uppercase text-muted-foreground">{label}</p>
-        <p className="text-2xl font-bold tabular-nums">{value}</p>
-        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+        {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
   );
@@ -37,17 +54,18 @@ export default async function DashboardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Today's sales" value={formatINR(stats.todaySalesPaise)} />
-        <Stat label="This month sales" value={formatINR(stats.monthSalesPaise)} />
-        <Stat label="Today's collection" value={formatINR(stats.todayCollectionPaise)} />
-        <Stat label="Stock value" value={formatINR(stats.stockValuePaise)} />
-        <Stat label="Receivables" value={formatINR(stats.receivablesPaise)} sub="Money owed to you" />
-        <Stat label="Payables" value={formatINR(stats.payablesPaise)} sub="You owe suppliers" />
-        <Stat label="This month expenses" value={formatINR(stats.monthExpensesPaise)} />
+        <Stat label="Today's sales" value={formatINR(stats.todaySalesPaise)} accent="var(--color-chart-1)" />
+        <Stat label="This month sales" value={formatINR(stats.monthSalesPaise)} accent="var(--color-chart-1)" />
+        <Stat label="Today's collection" value={formatINR(stats.todayCollectionPaise)} accent="var(--color-chart-3)" />
+        <Stat label="Stock value" value={formatINR(stats.stockValuePaise)} accent="var(--color-chart-2)" />
+        <Stat label="Receivables" value={formatINR(stats.receivablesPaise)} sub="Money owed to you" accent="var(--color-chart-3)" />
+        <Stat label="Payables" value={formatINR(stats.payablesPaise)} sub="You owe suppliers" accent="var(--color-chart-5)" />
+        <Stat label="This month expenses" value={formatINR(stats.monthExpensesPaise)} accent="var(--color-chart-4)" />
         <Stat
           label="Low-stock items"
           value={String(stats.lowStock.length)}
           sub={stats.lowStock.length ? "Needs reordering" : "All good"}
+          accent={stats.lowStock.length ? "var(--color-destructive)" : "var(--color-chart-3)"}
         />
       </div>
 

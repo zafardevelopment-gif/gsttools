@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { FileText } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
+import { MobileNav } from "@/components/layout/mobile-nav";
 import { TenantSwitcher } from "@/components/layout/tenant-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
 import { getAppContext } from "@/server/queries/app-context";
@@ -12,9 +15,15 @@ export default async function AppLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex h-14 items-center justify-between border-b px-4 print:hidden">
-        <div className="flex items-center gap-3">
-          <span className="font-bold tracking-tight">GST Billing</span>
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm print:hidden">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <MobileNav />
+          <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <FileText className="size-4" />
+            </span>
+            <span className="hidden sm:inline">GST Billing</span>
+          </Link>
           <TenantSwitcher tenants={ctx.tenants} activeTenantId={ctx.tenantId} />
         </div>
         <UserMenu label={ctx.userLabel} />
