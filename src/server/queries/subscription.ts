@@ -9,7 +9,7 @@ export async function getSubscription(): Promise<SubscriptionRow | null> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data } = await supabase
-    .from("GST_subscriptions")
+    .from("aimunim_subscriptions")
     .select("*")
     .eq("tenant_id", tenantId)
     .maybeSingle();
@@ -22,7 +22,7 @@ export async function getMonthlyInvoiceCount(): Promise<number> {
   const supabase = await createClient();
   const { from, to } = currentMonthRange();
   const { count } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("id", { count: "exact", head: true })
     .eq("tenant_id", tenantId)
     .eq("direction", "sale")

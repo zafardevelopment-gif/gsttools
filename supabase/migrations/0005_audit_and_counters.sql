@@ -3,11 +3,11 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- GST_audit_logs — lightweight activity trail.
+-- aimunim_audit_logs — lightweight activity trail.
 -- -----------------------------------------------------------------------------
-create table public."GST_audit_logs" (
+create table public."aimunim_audit_logs" (
   id          uuid primary key default gen_random_uuid(),
-  tenant_id   uuid not null references public."GST_tenants"(id) on delete cascade,
+  tenant_id   uuid not null references public."aimunim_tenants"(id) on delete cascade,
   user_id     uuid references auth.users(id) on delete set null,
   action      text not null,                 -- e.g. 'invoice.created'
   entity_type text,                           -- e.g. 'invoice'
@@ -16,29 +16,29 @@ create table public."GST_audit_logs" (
   created_at  timestamptz not null default now()
 );
 
-create index idx_audit_tenant_date on public."GST_audit_logs"(tenant_id, created_at desc);
+create index idx_audit_tenant_date on public."aimunim_audit_logs"(tenant_id, created_at desc);
 
-alter table public."GST_audit_logs" enable row level security;
+alter table public."aimunim_audit_logs" enable row level security;
 
 -- Owners/admins can read the trail; any member can append their own actions.
-create policy audit_select on public."GST_audit_logs"
+create policy audit_select on public."aimunim_audit_logs"
   for select using (public.has_tenant_role(tenant_id, array['owner','admin']));
-create policy audit_insert on public."GST_audit_logs"
+create policy audit_insert on public."aimunim_audit_logs"
   for insert with check (public.is_tenant_member(tenant_id));
 
 -- -----------------------------------------------------------------------------
--- GST_invoice_counters — per (tenant, direction) running sequence so invoice
+-- aimunim_invoice_counters — per (tenant, direction) running sequence so invoice
 -- numbers never collide under concurrency.
 -- -----------------------------------------------------------------------------
-create table public."GST_invoice_counters" (
-  tenant_id uuid not null references public."GST_tenants"(id) on delete cascade,
+create table public."aimunim_invoice_counters" (
+  tenant_id uuid not null references public."aimunim_tenants"(id) on delete cascade,
   direction text not null check (direction in ('sale','purchase')),
   last_seq  bigint not null default 0,
   primary key (tenant_id, direction)
 );
 
-alter table public."GST_invoice_counters" enable row level security;
-create policy invoice_counters_select on public."GST_invoice_counters"
+alter table public."aimunim_invoice_counters" enable row level security;
+create policy invoice_counters_select on public."aimunim_invoice_counters"
   for select using (public.is_tenant_member(tenant_id));
 
 -- gst_next_invoice_number(tenant, direction) -> formatted string.
@@ -62,17 +62,17 @@ begin
     raise exception 'Not a member of this tenant';
   end if;
 
-  insert into public."GST_invoice_counters" (tenant_id, direction, last_seq)
+  insert into public."aimunim_invoice_counters" (tenant_id, direction, last_seq)
   values (p_tenant_id, p_direction, 1)
   on conflict (tenant_id, direction)
-  do update set last_seq = public."GST_invoice_counters".last_seq + 1
+  do update set last_seq = public."aimunim_invoice_counters".last_seq + 1
   returning last_seq into v_seq;
 
   if p_direction = 'purchase' then
     v_prefix := 'PUR';
   else
     select coalesce(invoice_prefix, 'INV') into v_prefix
-      from public."GST_tenants" where id = p_tenant_id;
+      from public."aimunim_tenants" where id = p_tenant_id;
   end if;
 
   -- Indian financial year (Apr–Mar) tag, e.g. 2526 for FY 2025-26.

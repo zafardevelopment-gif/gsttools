@@ -28,9 +28,9 @@ export default async function AdminPage() {
 
   const admin = createAdminClient();
   const [{ data: tenants }, { data: subs }, { data: invoiceCounts }] = await Promise.all([
-    admin.from("GST_tenants").select("id, name, gstin, state, plan, created_at").order("created_at", { ascending: false }),
-    admin.from("GST_subscriptions").select("tenant_id, status, trial_ends_at, current_period_end"),
-    admin.from("GST_invoices").select("tenant_id, total_paise").eq("direction", "sale").neq("status", "draft"),
+    admin.from("aimunim_tenants").select("id, name, gstin, state, plan, created_at").order("created_at", { ascending: false }),
+    admin.from("aimunim_subscriptions").select("tenant_id, status, trial_ends_at, current_period_end"),
+    admin.from("aimunim_invoices").select("tenant_id, total_paise").eq("direction", "sale").neq("status", "draft"),
   ]);
 
   const subByTenant = new Map((subs ?? []).map((s) => [s.tenant_id, s]));

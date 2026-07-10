@@ -19,9 +19,25 @@ const REPORT_TYPES = [
   { key: "outstanding", label: "Outstanding" },
   { key: "stock", label: "Stock" },
   { key: "expense", label: "Expense" },
+  { key: "gstr1", label: "GSTR-1 (Sales)" },
+  { key: "gstr3b", label: "GSTR-3B Summary" },
+  { key: "hsn", label: "HSN-wise Sales" },
+  { key: "pnl", label: "Profit & Loss" },
+  { key: "daybook", label: "Daybook" },
+  { key: "ageing", label: "Receivable Ageing" },
+  { key: "balance_sheet", label: "Balance Sheet" },
 ] as const;
 
-const NEEDS_DATES = new Set(["sales", "purchase", "expense"]);
+const NEEDS_DATES = new Set([
+  "sales",
+  "purchase",
+  "expense",
+  "gstr1",
+  "gstr3b",
+  "hsn",
+  "pnl",
+  "daybook",
+]);
 
 export function ReportToolbar({
   type,

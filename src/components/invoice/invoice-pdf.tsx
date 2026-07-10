@@ -13,10 +13,24 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { formatINR } from "@/lib/money";
-import { STATE_CODE_TO_NAME } from "@/lib/constants";
+import {
+  STATE_CODE_TO_NAME,
+  INVOICE_THEMES,
+  type InvoiceThemeKey,
+  type PaperSizeKey,
+} from "@/lib/constants";
 import type { FullInvoice } from "@/server/queries/invoices";
 
 const money = (paise: number) => `Rs ${formatINR(paise, { withSymbol: false })}`;
+
+/** Paper sizes for printing (dimensions live server-side; labels in constants). */
+export const PAPER_SIZES = {
+  A4: { label: "A4", size: "A4" as const, padding: 32, fontSize: 9 },
+  A5: { label: "A5", size: "A5" as const, padding: 20, fontSize: 8 },
+  THERMAL: { label: "Thermal 80mm", size: [226.8, 841.9] as [number, number], padding: 10, fontSize: 7 },
+} as const;
+
+export type { PaperSizeKey, InvoiceThemeKey };
 
 const s = StyleSheet.create({
   page: { padding: 32, fontSize: 9, color: "#18181b", fontFamily: "Helvetica" },
@@ -62,18 +76,52 @@ const s = StyleSheet.create({
   },
 });
 
-export function InvoicePdf({ data }: { data: FullInvoice }) {
+export function InvoicePdf({
+  data,
+  paper = "A4",
+}: {
+  data: FullInvoice;
+  paper?: PaperSizeKey;
+}) {
   const { invoice, items, party, tenant } = data;
   const isGst = invoice.invoice_type === "gst";
   const interstate = invoice.is_interstate;
 
+  const theme =
+    INVOICE_THEMES[(invoice.template as InvoiceThemeKey) in INVOICE_THEMES
+      ? (invoice.template as InvoiceThemeKey)
+      : "classic"];
+  const sheet = PAPER_SIZES[paper] ?? PAPER_SIZES.A4;
+
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page
+        size={sheet.size}
+        style={[
+          s.page,
+          { padding: sheet.padding, fontSize: sheet.fontSize },
+          theme.headerBand ? { paddingTop: 0 } : {},
+        ]}
+      >
+        {theme.headerBand ? (
+          <View
+            style={{
+              backgroundColor: theme.accent,
+              marginHorizontal: -sheet.padding,
+              paddingHorizontal: sheet.padding,
+              paddingVertical: 6,
+              marginBottom: 8,
+            }}
+          >
+            <Text style={{ color: "#ffffff", fontSize: sheet.fontSize + 2, fontFamily: "Helvetica-Bold" }}>
+              {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
+            </Text>
+          </View>
+        ) : null}
         {/* Header */}
         <View style={s.between}>
           <View>
-            <Text style={s.h1}>{tenant.name}</Text>
+            <Text style={[s.h1, { color: theme.accent }]}>{tenant.name}</Text>
             {tenant.address_line1 ? <Text>{tenant.address_line1}</Text> : null}
             <Text>
               {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
@@ -82,9 +130,11 @@ export function InvoicePdf({ data }: { data: FullInvoice }) {
             {tenant.phone ? <Text>Ph: {tenant.phone}</Text> : null}
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={s.h2}>
-              {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
-            </Text>
+            {!theme.headerBand ? (
+              <Text style={s.h2}>
+                {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
+              </Text>
+            ) : null}
             <Text style={s.bold}>{invoice.invoice_number}</Text>
             <Text>Date: {invoice.invoice_date}</Text>
             {invoice.due_date ? <Text>Due: {invoice.due_date}</Text> : null}
@@ -123,7 +173,7 @@ export function InvoicePdf({ data }: { data: FullInvoice }) {
         </View>
 
         {/* Items */}
-        <View style={[s.th, s.section]}>
+        <View style={[s.th, s.section, { backgroundColor: theme.tableHead }]}>
           <Text style={s.cIdx}>#</Text>
           <Text style={s.cName}>Item</Text>
           <Text style={s.cHsn}>{isGst ? "HSN/SAC" : ""}</Text>
@@ -163,7 +213,7 @@ export function InvoicePdf({ data }: { data: FullInvoice }) {
           {invoice.round_off_paise !== 0 ? (
             <TotalRow label="Round off" value={money(invoice.round_off_paise)} />
           ) : null}
-          <View style={s.grand}>
+          <View style={[s.grand, { borderColor: theme.accent, color: theme.accent }]}>
             <Text>Total</Text>
             <Text>{money(invoice.total_paise)}</Text>
           </View>

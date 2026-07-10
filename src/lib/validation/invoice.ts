@@ -19,9 +19,25 @@ export const invoiceLineSchema = z.object({
   isTaxInclusive: z.boolean().optional().default(false),
 });
 
+export const voucherTypeSchema = z.enum([
+  "invoice",
+  "quotation",
+  "proforma",
+  "delivery_challan",
+  "sales_return",
+  "credit_note",
+  "purchase_return",
+  "debit_note",
+  "purchase_order",
+]);
+
 export const invoiceInputSchema = z.object({
   direction: z.enum(["sale", "purchase"]).default("sale"),
+  voucherType: voucherTypeSchema.default("invoice"),
   invoiceType: z.enum(["gst", "non_gst"]).default("gst"),
+  /** For returns/notes: the original invoice this voucher is issued against. */
+  againstInvoiceId: z.string().uuid().nullable().optional(),
+  paymentTermsDays: numberish(0).optional(),
   partyId: z.string().uuid().nullable().optional(),
   invoiceNumber: z.string().trim().optional(),
   invoiceDate: z.string().min(1),

@@ -10,7 +10,7 @@ export async function listExpenses(opts?: {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   let q = supabase
-    .from("GST_expenses")
+    .from("aimunim_expenses")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("expense_date", { ascending: false });

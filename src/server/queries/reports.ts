@@ -46,33 +46,33 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     { data: recent },
   ] = await Promise.all([
     supabase
-      .from("GST_invoices")
+      .from("aimunim_invoices")
       .select("invoice_date, total_paise")
       .eq("tenant_id", tenantId)
       .eq("direction", "sale")
       .neq("status", "draft")
       .gte("invoice_date", from)
       .lte("invoice_date", to),
-    supabase.from("GST_parties").select("balance_paise").eq("tenant_id", tenantId),
+    supabase.from("aimunim_parties").select("balance_paise").eq("tenant_id", tenantId),
     supabase
-      .from("GST_items")
+      .from("aimunim_items")
       .select("id, name, stock_qty, unit, low_stock_level, purchase_price_paise, type")
       .eq("tenant_id", tenantId)
       .eq("type", "product"),
     supabase
-      .from("GST_expenses")
+      .from("aimunim_expenses")
       .select("amount_paise")
       .eq("tenant_id", tenantId)
       .gte("expense_date", from)
       .lte("expense_date", to),
     supabase
-      .from("GST_payments")
+      .from("aimunim_payments")
       .select("amount_paise, direction, payment_date")
       .eq("tenant_id", tenantId)
       .eq("direction", "in")
       .eq("payment_date", td),
     supabase
-      .from("GST_invoices")
+      .from("aimunim_invoices")
       .select("id, invoice_number, invoice_date, total_paise, status")
       .eq("tenant_id", tenantId)
       .eq("direction", "sale")
@@ -132,7 +132,7 @@ async function invoiceReport(
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: invoices } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("invoice_number, invoice_date, party_id, taxable_value_paise, total_tax_paise, total_paise, status")
     .eq("tenant_id", tenantId)
     .eq("direction", direction)
@@ -144,7 +144,7 @@ async function invoiceReport(
   const partyIds = [...new Set((invoices ?? []).map((i) => i.party_id).filter(Boolean))] as string[];
   const names = new Map<string, string>();
   if (partyIds.length) {
-    const { data } = await supabase.from("GST_parties").select("id, name").in("id", partyIds);
+    const { data } = await supabase.from("aimunim_parties").select("id, name").in("id", partyIds);
     (data ?? []).forEach((p) => names.set(p.id, p.name));
   }
 
@@ -188,7 +188,7 @@ export async function outstandingReport(): Promise<ReportResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: parties } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .select("name, type, balance_paise")
     .eq("tenant_id", tenantId)
     .neq("balance_paise", 0)
@@ -221,7 +221,7 @@ export async function stockReport(): Promise<ReportResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: items } = await supabase
-    .from("GST_items")
+    .from("aimunim_items")
     .select("name, unit, stock_qty, low_stock_level, purchase_price_paise")
     .eq("tenant_id", tenantId)
     .eq("type", "product")
@@ -253,7 +253,7 @@ export async function expenseReport(from: string, to: string): Promise<ReportRes
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: expenses } = await supabase
-    .from("GST_expenses")
+    .from("aimunim_expenses")
     .select("expense_date, category, payment_mode, amount_paise, notes")
     .eq("tenant_id", tenantId)
     .gte("expense_date", from)

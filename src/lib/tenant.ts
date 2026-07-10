@@ -1,7 +1,7 @@
 /**
  * Active-tenant resolution.
  *
- * A user can belong to multiple tenants (businesses) via the GST_memberships
+ * A user can belong to multiple tenants (businesses) via the aimunim_memberships
  * table. The "active" tenant is stored in a cookie. Server code reads it here
  * and validates that the logged-in user is actually a member of that tenant
  * before trusting it.
@@ -46,7 +46,7 @@ export async function getActiveContext(): Promise<ActiveContext | null> {
 
   // Fetch the user's memberships (RLS limits this to their own rows).
   const { data: memberships } = await supabase
-    .from("GST_memberships")
+    .from("aimunim_memberships")
     .select("tenant_id, role")
     .order("created_at", { ascending: true });
 

@@ -126,6 +126,20 @@ export const PLANS = {
     name: "Diamond",
     pricePaise: 199900, // ₹1999/mo
     trialDays: 0,
+    limits: { invoicesPerMonth: Infinity, users: 2, items: Infinity },
+  },
+  platinum: {
+    key: "platinum",
+    name: "Platinum",
+    pricePaise: 299900, // ₹2999/mo
+    trialDays: 0,
+    limits: { invoicesPerMonth: Infinity, users: 4, items: Infinity },
+  },
+  enterprise: {
+    key: "enterprise",
+    name: "Enterprise",
+    pricePaise: 499900, // "starts at" ₹4999/mo — talk to sales
+    trialDays: 0,
     limits: { invoicesPerMonth: Infinity, users: Infinity, items: Infinity },
   },
 } as const;
@@ -140,3 +154,63 @@ export type InvoiceType = (typeof INVOICE_TYPES)[number];
 
 export const ITEM_TYPES = ["product", "service"] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
+
+/**
+ * Voucher types — one invoice table serves them all.
+ *   ledger : +1 adds to party outstanding, -1 reduces it, 0 none
+ *   stock  : +1 stock in, -1 stock out, 0 none (relative to the party side)
+ */
+export const VOUCHER_TYPES = {
+  invoice: { label: "Invoice", shortLabel: "Invoice", direction: "sale", ledger: 1, stock: -1 },
+  quotation: { label: "Quotation / Estimate", shortLabel: "Quotation", direction: "sale", ledger: 0, stock: 0 },
+  proforma: { label: "Proforma Invoice", shortLabel: "Proforma", direction: "sale", ledger: 0, stock: 0 },
+  delivery_challan: { label: "Delivery Challan", shortLabel: "Challan", direction: "sale", ledger: 0, stock: -1 },
+  sales_return: { label: "Sales Return", shortLabel: "Sale Return", direction: "sale", ledger: -1, stock: 1 },
+  credit_note: { label: "Credit Note", shortLabel: "Credit Note", direction: "sale", ledger: -1, stock: 0 },
+  purchase_return: { label: "Purchase Return", shortLabel: "Pur. Return", direction: "purchase", ledger: -1, stock: -1 },
+  debit_note: { label: "Debit Note", shortLabel: "Debit Note", direction: "purchase", ledger: -1, stock: 0 },
+  purchase_order: { label: "Purchase Order", shortLabel: "PO", direction: "purchase", ledger: 0, stock: 0 },
+} as const;
+
+export type VoucherTypeKey = keyof typeof VOUCHER_TYPES;
+
+/** Voucher types shown under the Sales section vs the Purchases section. */
+export const SALE_VOUCHER_TYPES: VoucherTypeKey[] = [
+  "invoice",
+  "quotation",
+  "proforma",
+  "delivery_challan",
+  "sales_return",
+  "credit_note",
+];
+export const PURCHASE_VOUCHER_TYPES: VoucherTypeKey[] = [
+  "invoice",
+  "purchase_order",
+  "purchase_return",
+  "debit_note",
+];
+
+/** Outbound notification channels (WhatsApp-first; SMS dormant). */
+export const NOTIFICATION_CHANNELS = ["whatsapp", "sms", "both"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+/**
+ * Invoice PDF themes (client-safe metadata; the PDF renderer maps these keys
+ * to @react-pdf styles in components/invoice/invoice-pdf.tsx).
+ */
+export const INVOICE_THEMES = {
+  classic: { label: "Classic", accent: "#18181b", headerBand: false, tableHead: "#f4f4f5" },
+  modern: { label: "Modern Indigo", accent: "#4f46e5", headerBand: true, tableHead: "#eef2ff" },
+  emerald: { label: "Emerald", accent: "#047857", headerBand: true, tableHead: "#ecfdf5" },
+  minimal: { label: "Minimal", accent: "#404040", headerBand: false, tableHead: "#ffffff" },
+} as const;
+export type InvoiceThemeKey = keyof typeof INVOICE_THEMES;
+
+/** Print paper sizes (client-safe metadata; dimensions live in invoice-pdf). */
+export const PAPER_SIZE_KEYS = ["A4", "A5", "THERMAL"] as const;
+export type PaperSizeKey = (typeof PAPER_SIZE_KEYS)[number];
+export const PAPER_SIZE_LABELS: Record<PaperSizeKey, string> = {
+  A4: "A4 (standard)",
+  A5: "A5 (half page)",
+  THERMAL: "Thermal 80mm (receipt)",
+};

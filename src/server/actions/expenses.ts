@@ -26,7 +26,7 @@ export async function createExpenseAction(formData: FormData): Promise<ActionRes
   const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("GST_expenses").insert({
+  const { error } = await supabase.from("aimunim_expenses").insert({
     tenant_id: tenantId,
     category: v.category,
     amount_paise: rupeesToPaise(v.amount),
@@ -45,7 +45,7 @@ export async function deleteExpenseAction(id: string): Promise<ActionResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { error } = await supabase
-    .from("GST_expenses")
+    .from("aimunim_expenses")
     .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);

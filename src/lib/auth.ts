@@ -17,19 +17,40 @@ import type { User } from "@supabase/supabase-js";
 /** Name of the cookie that marks a logged-in dev session. */
 export const DEV_AUTH_COOKIE = "gst_dev_auth";
 
+// Two dev personas: a platform-level super admin and a normal tenant end user.
+// The cookie stores which one is signed in ("superadmin" | "user").
+export const DEV_SUPERADMIN_EMAIL =
+  process.env.DEV_SUPERADMIN_EMAIL ?? "superadmin@aimunim.local";
+export const DEV_USER_EMAIL =
+  process.env.DEV_USER_EMAIL ?? "user@aimunim.local";
+
+export type DevRole = "superadmin" | "user";
+
 // In dev mode there is no real auth.users row. id is null so created_by inserts
 // NULL (the column is nullable) instead of violating the FK to auth.users.
-const DEMO_USER = { id: null as unknown as string } as unknown as User;
+function devUser(role: DevRole): User {
+  return {
+    id: null as unknown as string,
+    email: role === "superadmin" ? DEV_SUPERADMIN_EMAIL : DEV_USER_EMAIL,
+  } as unknown as User;
+}
 
-/** True when a dev login cookie is present. */
-async function isDevAuthed(): Promise<boolean> {
+/** The signed-in dev persona, or null when the cookie is absent/invalid. */
+async function getDevRole(): Promise<DevRole | null> {
   const store = await cookies();
-  return store.get(DEV_AUTH_COOKIE)?.value === "1";
+  const v = store.get(DEV_AUTH_COOKIE)?.value;
+  // "1" is the legacy cookie value from before roles existed; treat as end user.
+  if (v === "superadmin") return "superadmin";
+  if (v === "user" || v === "1") return "user";
+  return null;
 }
 
 /** Returns the current user or null. */
 export async function getUser(): Promise<User | null> {
-  if (authDisabled) return (await isDevAuthed()) ? DEMO_USER : null;
+  if (authDisabled) {
+    const role = await getDevRole();
+    return role ? devUser(role) : null;
+  }
   const supabase = await createClient();
   const {
     data: { user },
@@ -40,8 +61,9 @@ export async function getUser(): Promise<User | null> {
 /** Redirects to /login if not authenticated; returns the user otherwise. */
 export async function requireUser(): Promise<User> {
   if (authDisabled) {
-    if (!(await isDevAuthed())) redirect("/login");
-    return DEMO_USER;
+    const role = await getDevRole();
+    if (!role) redirect("/login");
+    return devUser(role);
   }
   const user = await getUser();
   if (!user) redirect("/login");
@@ -54,9 +76,10 @@ export async function requireUser(): Promise<User> {
  */
 export async function requireTenant() {
   if (authDisabled) {
-    if (!(await isDevAuthed())) redirect("/login");
+    const role = await getDevRole();
+    if (!role) redirect("/login");
     return {
-      user: DEMO_USER,
+      user: devUser(role),
       userId: null as unknown as string,
       tenantId: DEMO_TENANT_ID,
       role: "owner" as string,

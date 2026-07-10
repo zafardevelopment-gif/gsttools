@@ -7,7 +7,7 @@ export async function listItems(search?: string): Promise<ItemRow[]> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   let q = supabase
-    .from("GST_items")
+    .from("aimunim_items")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
@@ -20,7 +20,7 @@ export async function getLowStockItems(): Promise<ItemRow[]> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data } = await supabase
-    .from("GST_items")
+    .from("aimunim_items")
     .select("*")
     .eq("tenant_id", tenantId)
     .eq("type", "product");

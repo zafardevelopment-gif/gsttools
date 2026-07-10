@@ -10,8 +10,12 @@ import {
   isInterstateSupply,
   type GstLineInput,
 } from "@/lib/gst";
-import { rupeesToPaise } from "@/lib/money";
+import { rupeesToPaise, formatINR } from "@/lib/money";
 import { canCreateInvoice } from "@/server/gating";
+import { VOUCHER_TYPES } from "@/lib/constants";
+import { sendNotification } from "@/server/notifications";
+import { publicEnv } from "@/lib/env";
+import { logAudit } from "@/server/audit";
 
 export type CreateInvoiceResult = { id?: string; error?: string };
 
@@ -32,15 +36,21 @@ export async function createInvoiceAction(
 
   const { tenantId, userId } = await requireActiveContext();
 
-  // Plan gating: block when trial/subscription expired or over the monthly cap.
-  const gate = await canCreateInvoice(v.status === "draft");
-  if (!gate.ok) return { error: gate.error };
+  // Ledger/stock behaviour depends on the voucher type (invoice, quotation,
+  // return, note, …). See VOUCHER_TYPES in constants.ts.
+  const voucherMeta = VOUCHER_TYPES[v.voucherType];
+
+  // Plan gating: only real invoices count towards the monthly cap.
+  if (v.voucherType === "invoice") {
+    const gate = await canCreateInvoice(v.status === "draft");
+    if (!gate.ok) return { error: gate.error };
+  }
 
   const supabase = await createClient();
 
   // Business state (origin of supply).
   const { data: tenant } = await supabase
-    .from("GST_tenants")
+    .from("aimunim_tenants")
     .select("state_code")
     .eq("id", tenantId)
     .single();
@@ -50,7 +60,7 @@ export async function createInvoiceAction(
   let placeOfSupply: string | undefined;
   if (v.partyId) {
     const { data: party } = await supabase
-      .from("GST_parties")
+      .from("aimunim_parties")
       .select("state_code, gstin")
       .eq("id", v.partyId)
       .single();
@@ -75,26 +85,36 @@ export async function createInvoiceAction(
     roundOff: v.roundOff,
   });
 
-  // Invoice number (use provided, else generate atomically).
+  // Voucher number (use provided, else generate atomically per type).
   let invoiceNumber = v.invoiceNumber?.trim();
   if (!invoiceNumber) {
     const { data: gen, error: genErr } = await supabase.rpc(
       "gst_next_invoice_number",
-      { p_tenant_id: tenantId, p_direction: v.direction },
+      {
+        p_tenant_id: tenantId,
+        p_direction: v.direction,
+        p_voucher_type: v.voucherType,
+      },
     );
     if (genErr || !gen) return { error: genErr?.message ?? "Could not generate number." };
     invoiceNumber = gen;
   }
 
+  // Non-financial vouchers (quotation/proforma/challan/PO) have nothing to pay,
+  // so they never show as "unpaid" — mark them paid-neutral via 'unpaid' only
+  // for financial ones.
   const status = v.status === "draft" ? "draft" : "unpaid";
 
   // Insert header.
   const { data: invoice, error: invErr } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .insert({
       tenant_id: tenantId,
       party_id: v.partyId ?? null,
       direction: v.direction,
+      voucher_type: v.voucherType,
+      against_invoice_id: v.againstInvoiceId ?? null,
+      payment_terms_days: v.paymentTermsDays || null,
       invoice_type: v.invoiceType,
       invoice_number: invoiceNumber,
       invoice_date: v.invoiceDate,
@@ -151,38 +171,89 @@ export async function createInvoiceAction(
   }));
 
   const { error: itemsErr } = await supabase
-    .from("GST_invoice_items")
+    .from("aimunim_invoice_items")
     .insert(itemRows);
   if (itemsErr) {
     // Roll back the header so we don't leave an empty invoice.
-    await supabase.from("GST_invoices").delete().eq("id", invoice.id);
+    await supabase.from("aimunim_invoices").delete().eq("id", invoice.id);
     return { error: itemsErr.message };
   }
 
-  // Stock movements for product lines (skip drafts).
-  if (status !== "draft") {
+  // Stock movements for product lines (skip drafts and no-stock voucher types).
+  // voucherMeta.stock: -1 = stock out, +1 = stock in, 0 = no effect.
+  if (status !== "draft" && voucherMeta.stock !== 0) {
     const itemIds = v.lines.map((l) => l.itemId).filter(Boolean) as string[];
     if (itemIds.length) {
       const { data: items } = await supabase
-        .from("GST_items")
+        .from("aimunim_items")
         .select("id, type")
         .in("id", itemIds);
       const productIds = new Set(
         (items ?? []).filter((i) => i.type === "product").map((i) => i.id),
       );
+      const moveType =
+        v.voucherType === "sales_return" || v.voucherType === "purchase_return"
+          ? ("return" as const)
+          : v.direction === "sale"
+            ? ("sale" as const)
+            : ("purchase" as const);
+      // For purchases, stock:-1 means goods leave us (purchase return), and the
+      // plain purchase invoice (stock:-1 relative to party) means goods come IN,
+      // so flip the sign for purchase-side invoices.
+      const sign =
+        v.voucherType === "invoice" && v.direction === "purchase"
+          ? 1
+          : voucherMeta.stock;
       const moves = v.lines
         .filter((l) => l.itemId && productIds.has(l.itemId))
         .map((l) => ({
           tenant_id: tenantId,
           item_id: l.itemId as string,
-          qty_delta: v.direction === "sale" ? -Number(l.qty) : Number(l.qty),
-          type: v.direction === "sale" ? ("sale" as const) : ("purchase" as const),
+          qty_delta: sign * Number(l.qty),
+          type: moveType,
           reference_type: "invoice",
           reference_id: invoice.id,
         }));
-      if (moves.length) await supabase.from("GST_stock_movements").insert(moves);
+      if (moves.length) await supabase.from("aimunim_stock_movements").insert(moves);
     }
   }
+
+  // Invoice auto-share: send the PDF link to the party via NotificationService
+  // (WhatsApp by default; silently switches to SMS with the tenant setting).
+  // Fire-and-forget — a messaging failure must never block the sale.
+  if (v.voucherType === "invoice" && status !== "draft" && v.partyId) {
+    const { data: party } = await supabase
+      .from("aimunim_parties")
+      .select("name, phone")
+      .eq("id", v.partyId)
+      .single();
+    if (party?.phone) {
+      const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoice.id}/pdf`;
+      sendNotification({
+        tenantId,
+        type: "invoice_generated",
+        recipient: party.phone,
+        body: `Dear ${party.name}, your invoice ${invoiceNumber} of ${formatINR(totals.totalPaise)} has been generated. View/download: ${pdfUrl}`,
+        params: {
+          name: party.name,
+          number: invoiceNumber,
+          amount: (totals.totalPaise / 100).toFixed(2),
+          link: pdfUrl,
+        },
+        entityType: "invoice",
+        entityId: invoice.id,
+      }).catch((e) => console.error("[invoice auto-share] failed:", e));
+    }
+  }
+
+  logAudit({
+    tenantId,
+    userId,
+    action: `${v.voucherType}.created`,
+    entityType: "invoice",
+    entityId: invoice.id,
+    data: { number: invoiceNumber, total_paise: totals.totalPaise },
+  });
 
   revalidatePath("/invoices");
   revalidatePath("/parties");
@@ -193,23 +264,23 @@ export async function createInvoiceAction(
 export async function deleteInvoiceAction(
   id: string,
 ): Promise<{ ok?: true; error?: string }> {
-  const { tenantId } = await requireActiveContext();
+  const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
   // Reverse stock for this invoice before deleting (movements cascade away).
   const { data: inv } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("direction")
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .single();
   if (inv) {
     const { data: moves } = await supabase
-      .from("GST_stock_movements")
+      .from("aimunim_stock_movements")
       .select("item_id, qty_delta")
       .eq("reference_type", "invoice")
       .eq("reference_id", id);
     for (const m of moves ?? []) {
-      await supabase.from("GST_stock_movements").insert({
+      await supabase.from("aimunim_stock_movements").insert({
         tenant_id: tenantId,
         item_id: m.item_id,
         qty_delta: -m.qty_delta,
@@ -219,11 +290,19 @@ export async function deleteInvoiceAction(
     }
   }
   const { error } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);
   if (error) return { error: error.message };
+
+  logAudit({
+    tenantId,
+    userId,
+    action: "invoice.deleted",
+    entityType: "invoice",
+    entityId: id,
+  });
   revalidatePath("/invoices");
   revalidatePath("/parties");
   return { ok: true };

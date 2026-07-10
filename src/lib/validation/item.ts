@@ -28,6 +28,13 @@ export const itemFormSchema = z.object({
   // Opening stock — only applied on create (products only).
   opening_stock: numberish(0),
   low_stock_level: numberish(0),
+  barcode: z.string().trim().optional(),
+  // MRP in rupees (converted to paise in the action).
+  mrp: numberish(0).refine((n) => n >= 0, "MRP can't be negative."),
+  description: z.string().trim().optional(),
+  alt_unit: z.string().trim().optional(),
+  // 1 alt_unit = factor × unit (e.g. 1 BOX = 12 PCS).
+  alt_unit_factor: numberish(0),
 });
 
 export type ItemFormInput = z.input<typeof itemFormSchema>;

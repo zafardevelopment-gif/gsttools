@@ -7,7 +7,16 @@ import { Plus, Trash2 } from "lucide-react";
 import { createInvoiceAction } from "@/server/actions/invoices";
 import { computeInvoiceTotals, isInterstateSupply } from "@/lib/gst";
 import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/money";
-import { GST_RATES, STATE_CODE_TO_NAME } from "@/lib/constants";
+import {
+  GST_RATES,
+  STATE_CODE_TO_NAME,
+  VOUCHER_TYPES,
+  SALE_VOUCHER_TYPES,
+  PURCHASE_VOUCHER_TYPES,
+  INVOICE_THEMES,
+  type VoucherTypeKey,
+  type InvoiceThemeKey,
+} from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,16 +79,22 @@ export function InvoiceForm({
   items,
   businessStateCode,
   suggestedNumber,
+  initialVoucherType = "invoice",
 }: {
   parties: PartyOption[];
   items: ItemOption[];
   businessStateCode: string;
   suggestedNumber: string;
+  initialVoucherType?: VoucherTypeKey;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [direction, setDirection] = useState<"sale" | "purchase">("sale");
+  const [voucherType, setVoucherType] =
+    useState<VoucherTypeKey>(initialVoucherType);
+  const [direction, setDirection] = useState<"sale" | "purchase">(
+    VOUCHER_TYPES[initialVoucherType].direction,
+  );
   const [invoiceType, setInvoiceType] = useState<"gst" | "non_gst">("gst");
   const [partyId, setPartyId] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState(suggestedNumber);
@@ -91,6 +106,7 @@ export function InvoiceForm({
   const [roundOff, setRoundOff] = useState(true);
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
+  const [template, setTemplate] = useState<InvoiceThemeKey>("classic");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const party = parties.find((p) => p.id === partyId);
@@ -141,6 +157,7 @@ export function InvoiceForm({
     startTransition(async () => {
       const res = await createInvoiceAction({
         direction,
+        voucherType,
         invoiceType,
         partyId: partyId || null,
         invoiceNumber: invoiceNumber || undefined,
@@ -150,7 +167,7 @@ export function InvoiceForm({
         roundOff,
         notes,
         terms,
-        template: "classic",
+        template,
         status,
         lines: lines
           .filter((l) => l.name.trim())
@@ -185,12 +202,30 @@ export function InvoiceForm({
       <Card>
         <CardContent className="grid gap-4 pt-6 md:grid-cols-3">
           <div className="space-y-1.5">
-            <Label>Type</Label>
-            <Select value={direction} onValueChange={(v) => setDirection(v as "sale" | "purchase")}>
+            <Label>Voucher</Label>
+            <Select
+              value={`${direction}:${voucherType}`}
+              onValueChange={(v) => {
+                const [dir, vt] = v.split(":") as [
+                  "sale" | "purchase",
+                  VoucherTypeKey,
+                ];
+                setDirection(dir);
+                setVoucherType(vt);
+              }}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="sale">Sales invoice</SelectItem>
-                <SelectItem value="purchase">Purchase bill</SelectItem>
+                {SALE_VOUCHER_TYPES.map((vt) => (
+                  <SelectItem key={`sale:${vt}`} value={`sale:${vt}`}>
+                    {vt === "invoice" ? "Sales invoice" : VOUCHER_TYPES[vt].label}
+                  </SelectItem>
+                ))}
+                {PURCHASE_VOUCHER_TYPES.map((vt) => (
+                  <SelectItem key={`purchase:${vt}`} value={`purchase:${vt}`}>
+                    {vt === "invoice" ? "Purchase bill" : VOUCHER_TYPES[vt].label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -201,6 +236,28 @@ export function InvoiceForm({
               <SelectContent>
                 <SelectItem value="gst">GST invoice</SelectItem>
                 <SelectItem value="non_gst">Non-GST / cash</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Theme</Label>
+            <Select
+              value={template}
+              onValueChange={(v) => setTemplate(v as InvoiceThemeKey)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(INVOICE_THEMES) as InvoiceThemeKey[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block size-3 rounded-full"
+                        style={{ backgroundColor: INVOICE_THEMES[k].accent }}
+                      />
+                      {INVOICE_THEMES[k].label}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

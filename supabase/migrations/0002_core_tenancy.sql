@@ -3,9 +3,9 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- GST_tenants — one row per business.
+-- aimunim_tenants — one row per business.
 -- -----------------------------------------------------------------------------
-create table public."GST_tenants" (
+create table public."aimunim_tenants" (
   id            uuid primary key default gen_random_uuid(),
   name          text not null,
   legal_name    text,
@@ -20,7 +20,7 @@ create table public."GST_tenants" (
   phone         text,
   email         citext,
   logo_path     text,                 -- path within the `logos` storage bucket
-  -- Denormalised current plan for quick gating; source of truth is GST_subscriptions.
+  -- Denormalised current plan for quick gating; source of truth is aimunim_subscriptions.
   plan          text not null default 'trial'
                 check (plan in ('trial','silver','gold','diamond')),
   invoice_prefix text not null default 'INV',
@@ -29,16 +29,16 @@ create table public."GST_tenants" (
 );
 
 create trigger trg_tenants_updated_at
-  before update on public."GST_tenants"
+  before update on public."aimunim_tenants"
   for each row execute function public.gst_set_updated_at();
 
 -- -----------------------------------------------------------------------------
--- GST_memberships — maps a user to a tenant with a role.
+-- aimunim_memberships — maps a user to a tenant with a role.
 -- A user can belong to multiple tenants.
 -- -----------------------------------------------------------------------------
-create table public."GST_memberships" (
+create table public."aimunim_memberships" (
   id         uuid primary key default gen_random_uuid(),
-  tenant_id  uuid not null references public."GST_tenants"(id) on delete cascade,
+  tenant_id  uuid not null references public."aimunim_tenants"(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
   role       text not null default 'staff'
              check (role in ('owner','admin','staff')),
@@ -47,19 +47,19 @@ create table public."GST_memberships" (
   unique (tenant_id, user_id)
 );
 
-create index idx_memberships_user on public."GST_memberships"(user_id);
-create index idx_memberships_tenant on public."GST_memberships"(tenant_id);
+create index idx_memberships_user on public."aimunim_memberships"(user_id);
+create index idx_memberships_tenant on public."aimunim_memberships"(tenant_id);
 
 create trigger trg_memberships_updated_at
-  before update on public."GST_memberships"
+  before update on public."aimunim_memberships"
   for each row execute function public.gst_set_updated_at();
 
 -- -----------------------------------------------------------------------------
--- GST_subscriptions — billing state per tenant.
+-- aimunim_subscriptions — billing state per tenant.
 -- -----------------------------------------------------------------------------
-create table public."GST_subscriptions" (
+create table public."aimunim_subscriptions" (
   id                    uuid primary key default gen_random_uuid(),
-  tenant_id             uuid not null references public."GST_tenants"(id) on delete cascade,
+  tenant_id             uuid not null references public."aimunim_tenants"(id) on delete cascade,
   plan                  text not null default 'trial'
                         check (plan in ('trial','silver','gold','diamond')),
   status                text not null default 'trialing'
@@ -74,55 +74,55 @@ create table public."GST_subscriptions" (
   unique (tenant_id)
 );
 
-create index idx_subscriptions_tenant on public."GST_subscriptions"(tenant_id);
+create index idx_subscriptions_tenant on public."aimunim_subscriptions"(tenant_id);
 
 create trigger trg_subscriptions_updated_at
-  before update on public."GST_subscriptions"
+  before update on public."aimunim_subscriptions"
   for each row execute function public.gst_set_updated_at();
 
 -- =============================================================================
 -- RLS
 -- =============================================================================
-alter table public."GST_tenants"       enable row level security;
-alter table public."GST_memberships"   enable row level security;
-alter table public."GST_subscriptions" enable row level security;
+alter table public."aimunim_tenants"       enable row level security;
+alter table public."aimunim_memberships"   enable row level security;
+alter table public."aimunim_subscriptions" enable row level security;
 
--- --- GST_tenants -------------------------------------------------------------
-create policy tenants_select on public."GST_tenants"
+-- --- aimunim_tenants -------------------------------------------------------------
+create policy tenants_select on public."aimunim_tenants"
   for select using (public.is_tenant_member(id));
 
-create policy tenants_insert on public."GST_tenants"
+create policy tenants_insert on public."aimunim_tenants"
   for insert with check (auth.uid() is not null);
 
-create policy tenants_update on public."GST_tenants"
+create policy tenants_update on public."aimunim_tenants"
   for update using (public.has_tenant_role(id, array['owner','admin']))
   with check (public.has_tenant_role(id, array['owner','admin']));
 
-create policy tenants_delete on public."GST_tenants"
+create policy tenants_delete on public."aimunim_tenants"
   for delete using (public.has_tenant_role(id, array['owner']));
 
--- --- GST_memberships ---------------------------------------------------------
+-- --- aimunim_memberships ---------------------------------------------------------
 -- Members can see all memberships of their tenants (to view the team).
-create policy memberships_select on public."GST_memberships"
+create policy memberships_select on public."aimunim_memberships"
   for select using (public.is_tenant_member(tenant_id));
 
 -- Only owner/admin can add/modify/remove members (first owner is created via
 -- the SECURITY DEFINER provisioning RPC below, which bypasses RLS).
-create policy memberships_insert on public."GST_memberships"
+create policy memberships_insert on public."aimunim_memberships"
   for insert with check (public.has_tenant_role(tenant_id, array['owner','admin']));
 
-create policy memberships_update on public."GST_memberships"
+create policy memberships_update on public."aimunim_memberships"
   for update using (public.has_tenant_role(tenant_id, array['owner','admin']))
   with check (public.has_tenant_role(tenant_id, array['owner','admin']));
 
-create policy memberships_delete on public."GST_memberships"
+create policy memberships_delete on public."aimunim_memberships"
   for delete using (public.has_tenant_role(tenant_id, array['owner','admin']));
 
--- --- GST_subscriptions -------------------------------------------------------
-create policy subscriptions_select on public."GST_subscriptions"
+-- --- aimunim_subscriptions -------------------------------------------------------
+create policy subscriptions_select on public."aimunim_subscriptions"
   for select using (public.is_tenant_member(tenant_id));
 
-create policy subscriptions_modify on public."GST_subscriptions"
+create policy subscriptions_modify on public."aimunim_subscriptions"
   for all using (public.has_tenant_role(tenant_id, array['owner','admin']))
   with check (public.has_tenant_role(tenant_id, array['owner','admin']));
 
@@ -158,7 +158,7 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  insert into public."GST_tenants"
+  insert into public."aimunim_tenants"
     (name, legal_name, gstin, state_code, address_line1, address_line2,
      city, state, pincode, phone, email, logo_path, plan)
   values
@@ -166,10 +166,10 @@ begin
      p_city, p_state, p_pincode, p_phone, p_email, p_logo_path, 'trial')
   returning id into v_tenant_id;
 
-  insert into public."GST_memberships" (tenant_id, user_id, role)
+  insert into public."aimunim_memberships" (tenant_id, user_id, role)
   values (v_tenant_id, v_uid, 'owner');
 
-  insert into public."GST_subscriptions"
+  insert into public."aimunim_subscriptions"
     (tenant_id, plan, status, trial_ends_at, current_period_start, current_period_end)
   values
     (v_tenant_id, 'trial', 'trialing', now() + interval '14 days', now(), now() + interval '14 days');

@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Tag } from "lucide-react";
 import { ItemFormDialog } from "./item-form-dialog";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { deleteItemAction } from "@/server/actions/items";
@@ -71,6 +72,12 @@ export function ItemsTable({ items }: { items: ItemRow[] }) {
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-end gap-1">
+                    <Button variant="ghost" size="icon" asChild title="Print price tag">
+                      <Link href={`/items/${item.id}/label`}>
+                        <Tag className="size-4" />
+                        <span className="sr-only">Print label</span>
+                      </Link>
+                    </Button>
                     <ItemFormDialog
                       item={item}
                       trigger={

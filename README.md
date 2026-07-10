@@ -25,13 +25,13 @@ A production-grade, multi-tenant **GST billing SaaS** for Indian small businesse
 
 1. **Multi-tenancy via Postgres RLS.** Every tenant-scoped table has `tenant_id`
    and RLS policies. RLS — not app-layer filtering — is the security boundary.
-2. A user can belong to **multiple tenants** via `GST_memberships`. The active
+2. A user can belong to **multiple tenants** via `aimunim_memberships`. The active
    tenant is stored in the `gst_active_tenant` cookie.
 3. The **service-role key never reaches the client.** Browser uses the anon key
    (guarded by RLS); the service-role key is used only in trusted server code.
 4. **GST tax logic** lives in one pure, unit-tested function (Step 5).
 5. **Money is integer paise** everywhere (`src/lib/money.ts`). No floats for currency.
-6. **All DB tables are prefixed `GST_`** (e.g. `GST_invoices`).
+6. **All DB tables are prefixed `GST_`** (e.g. `aimunim_invoices`).
 
 ## Prerequisites
 

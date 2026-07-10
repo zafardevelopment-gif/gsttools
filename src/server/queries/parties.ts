@@ -10,7 +10,7 @@ export async function listParties(opts?: {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   let q = supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true });
@@ -25,7 +25,7 @@ export async function getParty(id: string): Promise<PartyRow | null> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .select("*")
     .eq("id", id)
     .eq("tenant_id", tenantId)

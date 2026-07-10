@@ -46,7 +46,7 @@ function LoginForm() {
               name="email"
               type="email"
               autoComplete="username"
-              placeholder="admin@gst.local"
+              placeholder="user@aimunim.local"
               required
               disabled={pending}
             />

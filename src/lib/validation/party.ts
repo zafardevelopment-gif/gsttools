@@ -29,6 +29,21 @@ export const partyFormSchema = z
     shipping_address: z.string().trim().optional(),
     // Opening balance in rupees (signed): +ve = party owes you; -ve = you owe.
     opening_balance: numberish(0),
+    pan: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .transform((v) => (v === "" ? undefined : v))
+      .optional()
+      .refine(
+        (v) => v === undefined || /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(v),
+        "Invalid PAN (e.g. ABCDE1234F).",
+      ),
+    category: z.string().trim().optional(),
+    contact_person: z.string().trim().optional(),
+    credit_period_days: numberish(0).refine((n) => n >= 0, "Can't be negative."),
+    // Credit limit in rupees (converted to paise in the action).
+    credit_limit: numberish(0).refine((n) => n >= 0, "Can't be negative."),
   })
   .refine(
     (d) => !d.gstin || !d.state_code || d.gstin.slice(0, 2) === d.state_code,

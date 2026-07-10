@@ -75,7 +75,7 @@ export async function createBusinessAction(
         .upload(path, logo, { upsert: true, contentType: logo.type });
       if (!upErr) {
         await supabase
-          .from("GST_tenants")
+          .from("aimunim_tenants")
           .update({ logo_path: path })
           .eq("id", tenantId);
       }

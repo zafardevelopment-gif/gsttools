@@ -29,7 +29,7 @@ declare
   v_inv     uuid := '41111111-1111-1111-1111-111111111111';
 begin
   -- ---- Tenant (Maharashtra, state code 27) ---------------------------------
-  insert into public."GST_tenants"
+  insert into public."aimunim_tenants"
     (id, name, legal_name, gstin, state_code, address_line1, city, state, pincode, phone, email, plan, invoice_prefix)
   values
     (v_tenant, 'Sharma Traders', 'Sharma Traders Pvt Ltd', '27ABCDE1234F1Z5', '27',
@@ -37,7 +37,7 @@ begin
      'owner@sharmatraders.test', 'trial', 'INV')
   on conflict (id) do update set name = excluded.name;
 
-  insert into public."GST_subscriptions"
+  insert into public."aimunim_subscriptions"
     (tenant_id, plan, status, trial_ends_at, current_period_start, current_period_end)
   values
     (v_tenant, 'trial', 'trialing', now() + interval '14 days', now(), now() + interval '14 days')
@@ -46,7 +46,7 @@ begin
   -- ---- Link your logged-in user as owner (if it exists) --------------------
   select id into v_user from auth.users where email = demo_email limit 1;
   if v_user is not null then
-    insert into public."GST_memberships" (tenant_id, user_id, role)
+    insert into public."aimunim_memberships" (tenant_id, user_id, role)
     values (v_tenant, v_user, 'owner')
     on conflict (tenant_id, user_id) do update set role = 'owner';
     raise notice 'Linked demo tenant to user %', demo_email;
@@ -56,7 +56,7 @@ begin
 
   -- ---- Parties --------------------------------------------------------------
   -- Customer in Maharashtra (intra-state -> CGST+SGST)
-  insert into public."GST_parties"
+  insert into public."aimunim_parties"
     (id, tenant_id, type, name, gstin, state_code, phone, billing_address)
   values
     (v_cust1, v_tenant, 'customer', 'Gupta Electronics', '27AAACG1234M1Z2', '27',
@@ -64,7 +64,7 @@ begin
   on conflict (id) do nothing;
 
   -- Customer in Karnataka (inter-state -> IGST)
-  insert into public."GST_parties"
+  insert into public."aimunim_parties"
     (id, tenant_id, type, name, gstin, state_code, phone, billing_address)
   values
     (v_cust2, v_tenant, 'customer', 'Reddy Hardware', '29AAACR5678K1Z9', '29',
@@ -72,14 +72,14 @@ begin
   on conflict (id) do nothing;
 
   -- Supplier (Maharashtra)
-  insert into public."GST_parties"
+  insert into public."aimunim_parties"
     (id, tenant_id, type, name, gstin, state_code, phone)
   values
     (v_supp1, v_tenant, 'supplier', 'Mahalaxmi Distributors', '27AAACM9999P1Z1', '27', '9833333333')
   on conflict (id) do nothing;
 
   -- ---- Items (prices in paise) ---------------------------------------------
-  insert into public."GST_items"
+  insert into public."aimunim_items"
     (id, tenant_id, type, name, sku, hsn_sac, unit, category, sale_price_paise, purchase_price_paise, tax_rate, stock_qty, low_stock_level)
   values
     (v_item1, v_tenant, 'product', 'LED Bulb 9W', 'LED-9W', '85395000', 'PCS', 'Lighting',
@@ -93,7 +93,7 @@ begin
   -- ---- A sample GST invoice (intra-state to Gupta Electronics) -------------
   -- 10 x LED Bulb @ ₹99 (12%) + 2 x Extension Board @ ₹249 (18%)
   -- Computed with the same rounding the app uses (see src/lib/gst.ts).
-  insert into public."GST_invoices"
+  insert into public."aimunim_invoices"
     (id, tenant_id, party_id, direction, invoice_type, invoice_number, invoice_date,
      place_of_supply_state, is_interstate,
      subtotal_paise, discount_paise, taxable_value_paise,
@@ -107,7 +107,7 @@ begin
      0, 0, 169644, 'unpaid', 'classic')  -- total = 148800 + 20844
   on conflict (id) do nothing;
 
-  insert into public."GST_invoice_items"
+  insert into public."aimunim_invoice_items"
     (tenant_id, invoice_id, item_id, line_no, name, hsn_sac, unit, qty, rate_paise,
      discount_percent, discount_paise, taxable_value_paise, tax_rate, cgst_paise, sgst_paise, igst_paise, amount_paise)
   values
@@ -118,7 +118,7 @@ begin
   on conflict do nothing;
 
   -- ---- Stock out for the sale (drives current stock down) ------------------
-  insert into public."GST_stock_movements"
+  insert into public."aimunim_stock_movements"
     (tenant_id, item_id, qty_delta, type, reference_type, reference_id)
   values
     (v_tenant, v_item1, -10, 'sale', 'invoice', v_inv),
@@ -126,14 +126,14 @@ begin
   on conflict do nothing;
 
   -- ---- A partial payment received against the invoice ----------------------
-  insert into public."GST_payments"
+  insert into public."aimunim_payments"
     (tenant_id, party_id, invoice_id, direction, amount_paise, mode, payment_date, reference)
   values
     (v_tenant, v_cust1, v_inv, 'in', 100000, 'upi', current_date, 'UPI-DEMO-001')
   on conflict do nothing;
 
   -- ---- A sample expense ----------------------------------------------------
-  insert into public."GST_expenses"
+  insert into public."aimunim_expenses"
     (tenant_id, category, amount_paise, expense_date, payment_mode, notes)
   values
     (v_tenant, 'Rent', 1500000, current_date, 'bank', 'Shop rent (demo)')

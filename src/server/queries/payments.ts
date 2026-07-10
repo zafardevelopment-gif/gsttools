@@ -12,7 +12,7 @@ export async function listPayments(): Promise<PaymentListRow[]> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: payments } = await supabase
-    .from("GST_payments")
+    .from("aimunim_payments")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("payment_date", { ascending: false })
@@ -25,12 +25,12 @@ export async function listPayments(): Promise<PaymentListRow[]> {
   const partyNames = new Map<string, string>();
   const invNumbers = new Map<string, string>();
   if (partyIds.length) {
-    const { data } = await supabase.from("GST_parties").select("id, name").in("id", partyIds);
+    const { data } = await supabase.from("aimunim_parties").select("id, name").in("id", partyIds);
     (data ?? []).forEach((p) => partyNames.set(p.id, p.name));
   }
   if (invIds.length) {
     const { data } = await supabase
-      .from("GST_invoices")
+      .from("aimunim_invoices")
       .select("id, invoice_number")
       .in("id", invIds);
     (data ?? []).forEach((i) => invNumbers.set(i.id, i.invoice_number));
@@ -52,7 +52,7 @@ export async function getOpenInvoicesForParty(
   const supabase = await createClient();
   const invDirection = paymentDirection === "in" ? "sale" : "purchase";
   const { data } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("id, invoice_number, total_paise, amount_paid_paise, status")
     .eq("tenant_id", tenantId)
     .eq("party_id", partyId)
@@ -82,7 +82,7 @@ export async function getPartyLedger(partyId: string): Promise<{
   const supabase = await createClient();
 
   const { data: party } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .select("*")
     .eq("id", partyId)
     .eq("tenant_id", tenantId)
@@ -91,13 +91,13 @@ export async function getPartyLedger(partyId: string): Promise<{
 
   const [{ data: invoices }, { data: payments }] = await Promise.all([
     supabase
-      .from("GST_invoices")
+      .from("aimunim_invoices")
       .select("id, invoice_number, invoice_date, direction, total_paise, status")
       .eq("tenant_id", tenantId)
       .eq("party_id", partyId)
       .neq("status", "draft"),
     supabase
-      .from("GST_payments")
+      .from("aimunim_payments")
       .select("id, payment_date, direction, amount_paise, mode")
       .eq("tenant_id", tenantId)
       .eq("party_id", partyId),

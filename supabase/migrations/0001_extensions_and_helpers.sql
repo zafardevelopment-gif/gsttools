@@ -12,7 +12,7 @@
 create extension if not exists "pgcrypto";   -- gen_random_uuid()
 create extension if not exists "citext";      -- case-insensitive text (emails)
 
--- Helper functions below reference GST_memberships, which is created later in
+-- Helper functions below reference aimunim_memberships, which is created later in
 -- 0002. `language sql` bodies are validated at CREATE time, so we defer that
 -- validation here to allow the forward reference within this migration.
 set check_function_bodies = off;
@@ -33,7 +33,7 @@ $$;
 -- -----------------------------------------------------------------------------
 -- current_tenant_ids() — the set of tenant_ids the calling user belongs to.
 --
--- SECURITY DEFINER so it can read GST_memberships without recursively invoking
+-- SECURITY DEFINER so it can read aimunim_memberships without recursively invoking
 -- that table's own RLS policy (which would otherwise reference this function).
 -- This is the single source of truth used by every tenant RLS policy.
 -- -----------------------------------------------------------------------------
@@ -45,7 +45,7 @@ security definer
 set search_path = public
 as $$
   select m.tenant_id
-  from public."GST_memberships" m
+  from public."aimunim_memberships" m
   where m.user_id = auth.uid();
 $$;
 
@@ -59,7 +59,7 @@ set search_path = public
 as $$
   select exists (
     select 1
-    from public."GST_memberships" m
+    from public."aimunim_memberships" m
     where m.user_id = auth.uid()
       and m.tenant_id = tid
   );
@@ -75,7 +75,7 @@ set search_path = public
 as $$
   select exists (
     select 1
-    from public."GST_memberships" m
+    from public."aimunim_memberships" m
     where m.user_id = auth.uid()
       and m.tenant_id = tid
       and m.role = any(roles)

@@ -8,9 +8,22 @@ import { authDisabled } from "@/lib/env";
 import { DEV_AUTH_COOKIE } from "@/lib/auth";
 
 // TEMPORARY dev credentials for the local email+password login (no OTP/email).
-// Override in .env.local with DEV_AUTH_EMAIL / DEV_AUTH_PASSWORD.
-const DEV_EMAIL = process.env.DEV_AUTH_EMAIL ?? "admin@gst.local";
-const DEV_PASSWORD = process.env.DEV_AUTH_PASSWORD ?? "admin123";
+// Two personas: a platform super admin and a normal tenant end user.
+// Override in .env.local with DEV_SUPERADMIN_* / DEV_USER_* if needed.
+const DEV_CREDENTIALS: Record<
+  string,
+  { password: string; role: "superadmin" | "user" }
+> = {
+  [(process.env.DEV_SUPERADMIN_EMAIL ?? "superadmin@aimunim.local").toLowerCase()]:
+    {
+      password: process.env.DEV_SUPERADMIN_PASSWORD ?? "super123",
+      role: "superadmin",
+    },
+  [(process.env.DEV_USER_EMAIL ?? "user@aimunim.local").toLowerCase()]: {
+    password: process.env.DEV_USER_PASSWORD ?? "user123",
+    role: "user",
+  },
+};
 
 export type DevSignInState = { error?: string };
 
@@ -28,15 +41,13 @@ export async function devSignIn(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  if (
-    email.toLowerCase() !== DEV_EMAIL.toLowerCase() ||
-    password !== DEV_PASSWORD
-  ) {
+  const cred = DEV_CREDENTIALS[email.toLowerCase()];
+  if (!cred || password !== cred.password) {
     return { error: "Invalid email or password." };
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(DEV_AUTH_COOKIE, "1", {
+  cookieStore.set(DEV_AUTH_COOKIE, cred.role, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -75,7 +86,7 @@ export async function setActiveTenantAction(tenantId: string) {
   if (!user) redirect("/login");
 
   const { data: membership } = await supabase
-    .from("GST_memberships")
+    .from("aimunim_memberships")
     .select("tenant_id")
     .eq("tenant_id", tenantId)
     .maybeSingle();

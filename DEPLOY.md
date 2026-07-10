@@ -67,7 +67,7 @@ The MVP ships a **stub** (`src/lib/razorpay.ts`). To go live:
 2. Implement `createCheckoutOrder()` with the Razorpay SDK and open Checkout
    on the client.
 3. Add a webhook route that calls `verifyWebhookSignature()` and sets
-   `GST_subscriptions.status = 'active'`. Gate `changePlanAction` behind it.
+   `aimunim_subscriptions.status = 'active'`. Gate `changePlanAction` behind it.
 
 ## 7. Post-deploy checklist
 

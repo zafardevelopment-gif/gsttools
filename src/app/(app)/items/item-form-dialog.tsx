@@ -172,6 +172,57 @@ export function ItemFormDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="barcode">Barcode</Label>
+              <Input id="barcode" name="barcode" defaultValue={item?.barcode ?? ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mrp">MRP (₹)</Label>
+              <Input
+                id="mrp"
+                name="mrp"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={item && item.mrp_paise > 0 ? paiseToRupees(item.mrp_paise) : ""}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="alt_unit">Alternate unit</Label>
+              <Input
+                id="alt_unit"
+                name="alt_unit"
+                placeholder="BOX"
+                defaultValue={item?.alt_unit ?? ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="alt_unit_factor">1 alt unit = ? {unit}</Label>
+              <Input
+                id="alt_unit_factor"
+                name="alt_unit_factor"
+                type="number"
+                step="0.0001"
+                min="0"
+                placeholder="12"
+                defaultValue={item?.alt_unit_factor ?? ""}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Input
+              id="description"
+              name="description"
+              defaultValue={item?.description ?? ""}
+            />
+          </div>
+
           {type === "product" && (
             <div className="grid grid-cols-2 gap-3">
               {!isEdit && (

@@ -5,6 +5,7 @@ import { formatINR } from "@/lib/money";
 import { STATE_CODE_TO_NAME } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ShareLedgerButton } from "./share-ledger-button";
 import {
   Table,
   TableBody,
@@ -39,6 +40,7 @@ export default async function PartyLedgerPage({
           <Link href="/parties">← All parties</Link>
         </Button>
         <div className="flex gap-2">
+          <ShareLedgerButton shareToken={party.share_token} />
           <Button asChild size="sm" variant="outline">
             <Link href={`/payments/new?party=${id}`}>Record payment</Link>
           </Button>

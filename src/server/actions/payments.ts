@@ -20,7 +20,7 @@ export async function createPaymentAction(input: PaymentInput): Promise<ActionRe
   const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("GST_payments").insert({
+  const { error } = await supabase.from("aimunim_payments").insert({
     tenant_id: tenantId,
     party_id: v.partyId,
     invoice_id: v.invoiceId ?? null,
@@ -44,7 +44,7 @@ export async function deletePaymentAction(id: string): Promise<ActionResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { error } = await supabase
-    .from("GST_payments")
+    .from("aimunim_payments")
     .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);

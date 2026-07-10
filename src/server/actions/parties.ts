@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
-import { partyFormSchema } from "@/lib/validation/party";
+import { partyFormSchema, type PartyFormValues } from "@/lib/validation/party";
 import { stateCodeFromGstin } from "@/lib/validation/common";
 import { rupeesToPaise } from "@/lib/money";
 
@@ -20,7 +20,23 @@ function parseParty(formData: FormData) {
     billing_address: formData.get("billing_address") ?? undefined,
     shipping_address: formData.get("shipping_address") ?? undefined,
     opening_balance: formData.get("opening_balance") ?? 0,
+    pan: formData.get("pan") ?? "",
+    category: formData.get("category") ?? undefined,
+    contact_person: formData.get("contact_person") ?? undefined,
+    credit_period_days: formData.get("credit_period_days") ?? 0,
+    credit_limit: formData.get("credit_limit") ?? 0,
   });
+}
+
+/** Column payload for the new (0007) party fields. */
+function extraPartyColumns(v: PartyFormValues) {
+  return {
+    pan: v.pan || null,
+    category: v.category || null,
+    contact_person: v.contact_person || null,
+    credit_period_days: Math.round(v.credit_period_days),
+    credit_limit_paise: rupeesToPaise(v.credit_limit),
+  };
 }
 
 export async function createPartyAction(formData: FormData): Promise<ActionResult> {
@@ -33,7 +49,7 @@ export async function createPartyAction(formData: FormData): Promise<ActionResul
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("GST_parties").insert({
+  const { error } = await supabase.from("aimunim_parties").insert({
     tenant_id: tenantId,
     type: v.type,
     name: v.name,
@@ -45,6 +61,7 @@ export async function createPartyAction(formData: FormData): Promise<ActionResul
     shipping_address: v.shipping_address || null,
     opening_balance_paise: openingPaise,
     balance_paise: openingPaise, // no transactions yet
+    ...extraPartyColumns(v),
   });
 
   if (error) return { error: error.message };
@@ -67,7 +84,7 @@ export async function updatePartyAction(
 
   // Adjust live balance by the change in opening balance so it stays correct.
   const { data: existing } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .select("opening_balance_paise, balance_paise")
     .eq("id", id)
     .eq("tenant_id", tenantId)
@@ -77,7 +94,7 @@ export async function updatePartyAction(
   const newBalance = (existing?.balance_paise ?? 0) + delta;
 
   const { error } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .update({
       type: v.type,
       name: v.name,
@@ -89,6 +106,7 @@ export async function updatePartyAction(
       shipping_address: v.shipping_address || null,
       opening_balance_paise: newOpening,
       balance_paise: newBalance,
+      ...extraPartyColumns(v),
     })
     .eq("id", id)
     .eq("tenant_id", tenantId);
@@ -102,7 +120,7 @@ export async function deletePartyAction(id: string): Promise<ActionResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { error } = await supabase
-    .from("GST_parties")
+    .from("aimunim_parties")
     .delete()
     .eq("id", id)
     .eq("tenant_id", tenantId);

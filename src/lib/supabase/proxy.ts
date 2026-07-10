@@ -16,7 +16,19 @@ import type { Database } from "@/lib/database.types";
 import { publicEnv, isSupabaseConfigured } from "@/lib/env";
 
 /** Routes that do NOT require authentication. */
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/api/health"];
+// /share = party shared-ledger portal (token-protected), /api/webhooks = WhatsApp,
+// /api/internal = n8n internal API (bearer-token protected).
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/auth",
+  "/api/health",
+  "/share",
+  "/store",
+  "/api/webhooks",
+  "/api/internal",
+  "/api/cron",
+];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -38,7 +50,9 @@ export async function updateSession(request: NextRequest) {
   // request through (page-level requireTenant resolves the demo tenant). We key
   // off the cookie rather than the NEXT_PUBLIC_AUTH_DISABLED env flag because
   // NEXT_PUBLIC_* values are not reliably available in the Edge proxy runtime.
-  if (request.cookies.get(DEV_AUTH_COOKIE)?.value === "1") {
+  const devRole = request.cookies.get(DEV_AUTH_COOKIE)?.value;
+  // "superadmin" | "user" are the current role values; "1" is the legacy value.
+  if (devRole === "superadmin" || devRole === "user" || devRole === "1") {
     return NextResponse.next({ request });
   }
 

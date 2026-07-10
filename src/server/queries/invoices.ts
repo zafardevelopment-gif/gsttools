@@ -12,17 +12,19 @@ export type InvoiceListRow = InvoiceRow & { party_name: string | null };
 
 export async function listInvoices(opts?: {
   direction?: "sale" | "purchase";
+  voucherType?: InvoiceRow["voucher_type"];
 }): Promise<InvoiceListRow[]> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
 
   let q = supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("invoice_date", { ascending: false })
     .order("created_at", { ascending: false });
   if (opts?.direction) q = q.eq("direction", opts.direction);
+  if (opts?.voucherType) q = q.eq("voucher_type", opts.voucherType);
   const { data: invoices } = await q;
   if (!invoices || invoices.length === 0) return [];
 
@@ -31,7 +33,7 @@ export async function listInvoices(opts?: {
   const names = new Map<string, string>();
   if (partyIds.length) {
     const { data: parties } = await supabase
-      .from("GST_parties")
+      .from("aimunim_parties")
       .select("id, name")
       .in("id", partyIds);
     (parties ?? []).forEach((p) => names.set(p.id, p.name));
@@ -55,7 +57,7 @@ export async function getInvoice(id: string): Promise<FullInvoice | null> {
   const supabase = await createClient();
 
   const { data: invoice } = await supabase
-    .from("GST_invoices")
+    .from("aimunim_invoices")
     .select("*")
     .eq("id", id)
     .eq("tenant_id", tenantId)
@@ -64,17 +66,17 @@ export async function getInvoice(id: string): Promise<FullInvoice | null> {
 
   const [{ data: items }, { data: tenant }] = await Promise.all([
     supabase
-      .from("GST_invoice_items")
+      .from("aimunim_invoice_items")
       .select("*")
       .eq("invoice_id", id)
       .order("line_no", { ascending: true }),
-    supabase.from("GST_tenants").select("*").eq("id", tenantId).single(),
+    supabase.from("aimunim_tenants").select("*").eq("id", tenantId).single(),
   ]);
 
   let party: PartyRow | null = null;
   if (invoice.party_id) {
     const { data } = await supabase
-      .from("GST_parties")
+      .from("aimunim_parties")
       .select("*")
       .eq("id", invoice.party_id)
       .maybeSingle();

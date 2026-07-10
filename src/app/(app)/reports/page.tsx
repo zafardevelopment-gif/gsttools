@@ -10,6 +10,15 @@ import {
   currentMonthRange,
   type ReportResult,
 } from "@/server/queries/reports";
+import {
+  gstr1Report,
+  gstr3bReport,
+  hsnSalesReport,
+  profitLossReport,
+  daybookReport,
+  ageingReport,
+  balanceSheetReport,
+} from "@/server/queries/reports-extra";
 
 export const metadata = { title: "Reports · GST Billing" };
 
@@ -37,6 +46,27 @@ export default async function ReportsPage({
       break;
     case "expense":
       report = await expenseReport(from, to);
+      break;
+    case "gstr1":
+      report = await gstr1Report(from, to);
+      break;
+    case "gstr3b":
+      report = await gstr3bReport(from, to);
+      break;
+    case "hsn":
+      report = await hsnSalesReport(from, to);
+      break;
+    case "pnl":
+      report = await profitLossReport(from, to);
+      break;
+    case "daybook":
+      report = await daybookReport(from, to);
+      break;
+    case "ageing":
+      report = await ageingReport();
+      break;
+    case "balance_sheet":
+      report = await balanceSheetReport();
       break;
     case "sales":
     default:

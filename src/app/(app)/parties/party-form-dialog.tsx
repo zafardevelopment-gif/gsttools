@@ -162,6 +162,65 @@ export function PartyFormDialog({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pan">PAN</Label>
+              <Input
+                id="pan"
+                name="pan"
+                className="uppercase"
+                placeholder="ABCDE1234F"
+                defaultValue={party?.pan ?? ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="party_category">Category</Label>
+              <Input
+                id="party_category"
+                name="category"
+                placeholder="Retail / Wholesale…"
+                defaultValue={party?.category ?? ""}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="contact_person">Contact person</Label>
+              <Input
+                id="contact_person"
+                name="contact_person"
+                defaultValue={party?.contact_person ?? ""}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="credit_period_days">Credit period (days)</Label>
+              <Input
+                id="credit_period_days"
+                name="credit_period_days"
+                type="number"
+                min="0"
+                step="1"
+                defaultValue={party?.credit_period_days ?? "0"}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="credit_limit">Credit limit (₹)</Label>
+              <Input
+                id="credit_limit"
+                name="credit_limit"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={
+                  party && party.credit_limit_paise > 0
+                    ? paiseToRupees(party.credit_limit_paise)
+                    : "0"
+                }
+              />
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="opening_balance">
               Opening balance (₹) — positive: they owe you

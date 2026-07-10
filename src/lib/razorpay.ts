@@ -5,7 +5,7 @@
  *  1. Server creates a Razorpay subscription/order with RAZORPAY_KEY_ID/SECRET.
  *  2. Client opens Razorpay Checkout with the order id.
  *  3. On success, Razorpay calls a webhook; we verify the signature with the
- *     secret and mark GST_subscriptions.status = 'active'.
+ *     secret and mark aimunim_subscriptions.status = 'active'.
  *
  * Until keys are configured, `isRazorpayConfigured` is false and the UI shows a
  * "demo upgrade" that simply flips the plan via a server action.

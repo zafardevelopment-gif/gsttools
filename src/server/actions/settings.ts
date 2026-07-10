@@ -34,7 +34,7 @@ export async function updateBusinessAction(formData: FormData): Promise<ActionRe
   const invoicePrefix = (formData.get("invoice_prefix") as string)?.trim();
 
   const { error } = await supabase
-    .from("GST_tenants")
+    .from("aimunim_tenants")
     .update({
       name: v.name,
       legal_name: v.legal_name || null,
@@ -54,5 +54,54 @@ export async function updateBusinessAction(formData: FormData): Promise<ActionRe
   if (error) return { error: error.message };
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/**
+ * Update invoice/print/notification preferences (owner/admin only):
+ * default paper size, notification channel.
+ */
+export async function updatePreferencesAction(input: {
+  paper?: string;
+  notificationChannel?: string;
+  storeEnabled?: boolean;
+  storeSlug?: string;
+}): Promise<ActionResult> {
+  const { tenantId, role } = await requireActiveContext();
+  if (role !== "owner" && role !== "admin") {
+    return { error: "Only an owner or admin can edit preferences." };
+  }
+
+  const paper = ["A4", "A5", "THERMAL"].includes(input.paper ?? "")
+    ? input.paper
+    : "A4";
+  const channel = ["whatsapp", "sms", "both"].includes(input.notificationChannel ?? "")
+    ? input.notificationChannel
+    : "whatsapp";
+
+  const slug = (input.storeSlug ?? "").trim().toLowerCase();
+  if (input.storeEnabled && !/^[a-z0-9][a-z0-9-]{1,48}$/.test(slug)) {
+    return {
+      error: "Store link me sirf letters, numbers, dash — e.g. sharma-traders",
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("aimunim_tenants")
+    .update({
+      print_settings: { paper },
+      notification_channel: channel as "whatsapp" | "sms" | "both",
+      store_enabled: !!input.storeEnabled,
+      store_slug: slug || null,
+    })
+    .eq("id", tenantId);
+
+  if (error) {
+    return {
+      error: error.code === "23505" ? "Ye store link kisi aur business ne le liya hai." : error.message,
+    };
+  }
+  revalidatePath("/settings");
   return { ok: true };
 }

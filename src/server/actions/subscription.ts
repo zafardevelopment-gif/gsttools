@@ -28,7 +28,7 @@ export async function changePlanAction(plan: PlanKey): Promise<ActionResult> {
 
   const isTrial = plan === "trial";
   const { error } = await supabase
-    .from("GST_subscriptions")
+    .from("aimunim_subscriptions")
     .update({
       plan,
       status: isTrial ? "trialing" : "active",
@@ -42,7 +42,7 @@ export async function changePlanAction(plan: PlanKey): Promise<ActionResult> {
   if (error) return { error: error.message };
 
   // Keep the denormalised tenant.plan in sync (used for quick gating/display).
-  await supabase.from("GST_tenants").update({ plan }).eq("id", tenantId);
+  await supabase.from("aimunim_tenants").update({ plan }).eq("id", tenantId);
 
   revalidatePath("/subscription");
   revalidatePath("/dashboard");

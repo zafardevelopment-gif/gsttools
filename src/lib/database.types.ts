@@ -33,21 +33,45 @@ export type TenantRow = Timestamps & {
   phone: string | null;
   email: string | null;
   logo_path: string | null;
-  plan: "trial" | "silver" | "gold" | "diamond";
+  plan: PlanName;
   invoice_prefix: string;
+  notification_channel: "whatsapp" | "sms" | "both";
+  store_enabled: boolean;
+  store_slug: string | null;
+  pan: string | null;
+  financial_year_start: string | null;
+  invoice_settings: Json;
+  print_settings: Json;
+  default_terms: string | null;
 }
+
+export type PlanName =
+  | "trial"
+  | "silver"
+  | "gold"
+  | "diamond"
+  | "platinum"
+  | "enterprise";
 
 export type MembershipRow = Timestamps & {
   id: string;
   tenant_id: string;
   user_id: string;
-  role: "owner" | "admin" | "staff";
+  role:
+    | "owner"
+    | "admin"
+    | "partner"
+    | "ca"
+    | "salesman"
+    | "stock_manager"
+    | "delivery_boy"
+    | "staff";
 }
 
 export type SubscriptionRow = Timestamps & {
   id: string;
   tenant_id: string;
-  plan: "trial" | "silver" | "gold" | "diamond";
+  plan: PlanName;
   status: "trialing" | "active" | "past_due" | "canceled" | "expired";
   trial_ends_at: string | null;
   current_period_start: string | null;
@@ -71,6 +95,16 @@ export type PartyRow = Timestamps & {
   balance_paise: number;
   notes: string | null;
   is_active: boolean;
+  pan: string | null;
+  category: string | null;
+  credit_period_days: number;
+  credit_limit_paise: number;
+  contact_person: string | null;
+  date_of_birth: string | null;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  share_token: string;
 }
 
 export type ItemRow = Timestamps & {
@@ -89,7 +123,25 @@ export type ItemRow = Timestamps & {
   stock_qty: number;
   low_stock_level: number;
   is_active: boolean;
+  barcode: string | null;
+  mrp_paise: number;
+  alt_unit: string | null;
+  alt_unit_factor: number | null;
+  description: string | null;
+  image_path: string | null;
+  default_discount_percent: number;
 }
+
+export type VoucherType =
+  | "invoice"
+  | "quotation"
+  | "proforma"
+  | "delivery_challan"
+  | "sales_return"
+  | "credit_note"
+  | "purchase_return"
+  | "debit_note"
+  | "purchase_order";
 
 export type InvoiceRow = Timestamps & {
   id: string;
@@ -118,6 +170,11 @@ export type InvoiceRow = Timestamps & {
   notes: string | null;
   terms: string | null;
   created_by: string | null;
+  voucher_type: VoucherType;
+  against_invoice_id: string | null;
+  payment_terms_days: number | null;
+  is_cancelled: boolean;
+  cancelled_reason: string | null;
 }
 
 export type InvoiceItemRow = {
@@ -154,6 +211,7 @@ export type PaymentRow = Timestamps & {
   payment_date: string;
   notes: string | null;
   created_by: string | null;
+  bank_account_id: string | null;
 }
 
 export type ExpenseRow = Timestamps & {
@@ -179,6 +237,174 @@ export type StockMovementRow = {
   notes: string | null;
   created_by: string | null;
   created_at: string;
+  godown_id: string | null;
+}
+
+// ---- New tables (0007 full-spec expansion) ----------------------------------
+export type GodownRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  name: string;
+  address: string | null;
+  is_default: boolean;
+}
+
+export type ItemStockRow = {
+  tenant_id: string;
+  item_id: string;
+  godown_id: string;
+  qty: number;
+}
+
+export type BankAccountRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  name: string;
+  account_number: string | null;
+  ifsc: string | null;
+  opening_balance_paise: number;
+  is_default: boolean;
+  is_active: boolean;
+}
+
+export type CashbankTxnRow = {
+  id: string;
+  tenant_id: string;
+  account_id: string | null;
+  direction: "in" | "out";
+  amount_paise: number;
+  kind: "adjustment" | "transfer";
+  transfer_group: string | null;
+  txn_date: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type NotificationLogRow = {
+  id: string;
+  tenant_id: string;
+  channel: "whatsapp" | "sms";
+  template: string;
+  recipient: string;
+  status: "queued" | "sent" | "delivered" | "failed" | "skipped";
+  error: string | null;
+  payload: Json | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  created_at: string;
+}
+
+export type WhatsappTemplateRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  name: string;
+  language: string;
+  category: string;
+  body: string | null;
+  status: "pending" | "approved" | "rejected";
+}
+
+export type RecurringInvoiceRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  party_id: string;
+  name: string;
+  frequency: "daily" | "weekly" | "monthly";
+  next_run_date: string;
+  last_run_at: string | null;
+  items: Json;
+  auto_share: boolean;
+  is_active: boolean;
+}
+
+export type ReminderRuleRow = {
+  id: string;
+  tenant_id: string;
+  offset_days: number;
+  enabled: boolean;
+  created_at: string;
+}
+
+export type StaffRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  name: string;
+  phone: string | null;
+  designation: string | null;
+  basic_salary_paise: number;
+  hra_paise: number;
+  conveyance_paise: number;
+  is_active: boolean;
+  joined_on: string | null;
+}
+
+export type AttendanceRow = {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  day: string;
+  status: "present" | "absent" | "half_day" | "overtime";
+  overtime_hours: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export type StaffLedgerRow = {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  kind: "advance" | "loan" | "deduction" | "repayment";
+  amount_paise: number;
+  entry_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type PayslipRow = {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  month: string;
+  days_present: number;
+  days_in_month: number;
+  gross_paise: number;
+  deductions_paise: number;
+  net_paise: number;
+  generated_at: string;
+}
+
+export type OnlineOrderRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  address: string | null;
+  items: Json;
+  total_paise: number;
+  status: "new" | "confirmed" | "dispatched" | "delivered" | "cancelled";
+  payment_mode: "cod" | "upi" | "online";
+  notes: string | null;
+}
+
+export type CampaignRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  name: string;
+  channel: "whatsapp" | "sms";
+  template: string | null;
+  body: string | null;
+  audience: "all" | "customers" | "suppliers";
+  status: "draft" | "sending" | "sent" | "failed";
+  sent_count: number;
+}
+
+export type InvoiceCounterRow = {
+  tenant_id: string;
+  direction: "sale" | "purchase";
+  voucher_type: string;
+  last_seq: number;
 }
 
 export type AuditLogRow = {
@@ -208,17 +434,32 @@ type TableDef<Row, Ins, Upd> = {
 export type Database = {
   public: {
     Tables: {
-      GST_tenants: TableDef<TenantRow, Insert<TenantRow, "name" | "state_code">, Partial<TenantRow>>;
-      GST_memberships: TableDef<MembershipRow, Insert<MembershipRow, "tenant_id" | "user_id">, Partial<MembershipRow>>;
-      GST_subscriptions: TableDef<SubscriptionRow, Insert<SubscriptionRow, "tenant_id">, Partial<SubscriptionRow>>;
-      GST_parties: TableDef<PartyRow, Insert<PartyRow, "tenant_id" | "name">, Partial<PartyRow>>;
-      GST_items: TableDef<ItemRow, Insert<ItemRow, "tenant_id" | "name">, Partial<ItemRow>>;
-      GST_invoices: TableDef<InvoiceRow, Insert<InvoiceRow, "tenant_id" | "invoice_number">, Partial<InvoiceRow>>;
-      GST_invoice_items: TableDef<InvoiceItemRow, Insert<InvoiceItemRow, "tenant_id" | "invoice_id" | "name">, Partial<InvoiceItemRow>>;
-      GST_payments: TableDef<PaymentRow, Insert<PaymentRow, "tenant_id" | "direction" | "amount_paise">, Partial<PaymentRow>>;
-      GST_expenses: TableDef<ExpenseRow, Insert<ExpenseRow, "tenant_id" | "amount_paise">, Partial<ExpenseRow>>;
-      GST_stock_movements: TableDef<StockMovementRow, Insert<StockMovementRow, "tenant_id" | "item_id" | "qty_delta" | "type">, Partial<StockMovementRow>>;
-      GST_audit_logs: TableDef<AuditLogRow, Insert<AuditLogRow, "tenant_id" | "action">, Partial<AuditLogRow>>;
+      aimunim_tenants: TableDef<TenantRow, Insert<TenantRow, "name" | "state_code">, Partial<TenantRow>>;
+      aimunim_memberships: TableDef<MembershipRow, Insert<MembershipRow, "tenant_id" | "user_id">, Partial<MembershipRow>>;
+      aimunim_subscriptions: TableDef<SubscriptionRow, Insert<SubscriptionRow, "tenant_id">, Partial<SubscriptionRow>>;
+      aimunim_parties: TableDef<PartyRow, Insert<PartyRow, "tenant_id" | "name">, Partial<PartyRow>>;
+      aimunim_items: TableDef<ItemRow, Insert<ItemRow, "tenant_id" | "name">, Partial<ItemRow>>;
+      aimunim_invoices: TableDef<InvoiceRow, Insert<InvoiceRow, "tenant_id" | "invoice_number">, Partial<InvoiceRow>>;
+      aimunim_invoice_items: TableDef<InvoiceItemRow, Insert<InvoiceItemRow, "tenant_id" | "invoice_id" | "name">, Partial<InvoiceItemRow>>;
+      aimunim_payments: TableDef<PaymentRow, Insert<PaymentRow, "tenant_id" | "direction" | "amount_paise">, Partial<PaymentRow>>;
+      aimunim_expenses: TableDef<ExpenseRow, Insert<ExpenseRow, "tenant_id" | "amount_paise">, Partial<ExpenseRow>>;
+      aimunim_stock_movements: TableDef<StockMovementRow, Insert<StockMovementRow, "tenant_id" | "item_id" | "qty_delta" | "type">, Partial<StockMovementRow>>;
+      aimunim_audit_logs: TableDef<AuditLogRow, Insert<AuditLogRow, "tenant_id" | "action">, Partial<AuditLogRow>>;
+      aimunim_invoice_counters: TableDef<InvoiceCounterRow, InvoiceCounterRow, Partial<InvoiceCounterRow>>;
+      aimunim_godowns: TableDef<GodownRow, Insert<GodownRow, "tenant_id" | "name">, Partial<GodownRow>>;
+      aimunim_item_stocks: TableDef<ItemStockRow, Insert<ItemStockRow, "tenant_id" | "item_id" | "godown_id">, Partial<ItemStockRow>>;
+      aimunim_bank_accounts: TableDef<BankAccountRow, Insert<BankAccountRow, "tenant_id" | "name">, Partial<BankAccountRow>>;
+      aimunim_cashbank_txns: TableDef<CashbankTxnRow, Insert<CashbankTxnRow, "tenant_id" | "direction" | "amount_paise">, Partial<CashbankTxnRow>>;
+      aimunim_notification_logs: TableDef<NotificationLogRow, Insert<NotificationLogRow, "tenant_id" | "channel" | "template" | "recipient">, Partial<NotificationLogRow>>;
+      aimunim_whatsapp_templates: TableDef<WhatsappTemplateRow, Insert<WhatsappTemplateRow, "tenant_id" | "name">, Partial<WhatsappTemplateRow>>;
+      aimunim_recurring_invoices: TableDef<RecurringInvoiceRow, Insert<RecurringInvoiceRow, "tenant_id" | "party_id" | "name" | "frequency" | "next_run_date">, Partial<RecurringInvoiceRow>>;
+      aimunim_reminder_rules: TableDef<ReminderRuleRow, Insert<ReminderRuleRow, "tenant_id" | "offset_days">, Partial<ReminderRuleRow>>;
+      aimunim_staff: TableDef<StaffRow, Insert<StaffRow, "tenant_id" | "name">, Partial<StaffRow>>;
+      aimunim_attendance: TableDef<AttendanceRow, Insert<AttendanceRow, "tenant_id" | "staff_id" | "day" | "status">, Partial<AttendanceRow>>;
+      aimunim_staff_ledger: TableDef<StaffLedgerRow, Insert<StaffLedgerRow, "tenant_id" | "staff_id" | "kind" | "amount_paise">, Partial<StaffLedgerRow>>;
+      aimunim_payslips: TableDef<PayslipRow, Insert<PayslipRow, "tenant_id" | "staff_id" | "month">, Partial<PayslipRow>>;
+      aimunim_online_orders: TableDef<OnlineOrderRow, Insert<OnlineOrderRow, "tenant_id" | "order_number" | "customer_name" | "customer_phone">, Partial<OnlineOrderRow>>;
+      aimunim_campaigns: TableDef<CampaignRow, Insert<CampaignRow, "tenant_id" | "name">, Partial<CampaignRow>>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -240,7 +481,7 @@ export type Database = {
         Returns: string;
       };
       gst_next_invoice_number: {
-        Args: { p_tenant_id: string; p_direction?: string };
+        Args: { p_tenant_id: string; p_direction?: string; p_voucher_type?: string };
         Returns: string;
       };
     };

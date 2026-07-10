@@ -26,7 +26,7 @@ export async function getAppContext(): Promise<AppContext> {
   if (authDisabled) {
     const svc = createAdminClient();
     const { data: tenant } = await svc
-      .from("GST_tenants")
+      .from("aimunim_tenants")
       .select("*")
       .eq("id", tenantId)
       .maybeSingle();
@@ -44,14 +44,14 @@ export async function getAppContext(): Promise<AppContext> {
 
   // Businesses this user belongs to (RLS scopes to their own memberships).
   const { data: memberships } = await supabase
-    .from("GST_memberships")
+    .from("aimunim_memberships")
     .select("tenant_id")
     .order("created_at", { ascending: true });
 
   const tenantIds = (memberships ?? []).map((m) => m.tenant_id);
 
   const { data: tenantRows } = await supabase
-    .from("GST_tenants")
+    .from("aimunim_tenants")
     .select("*")
     .in("id", tenantIds.length ? tenantIds : ["00000000-0000-0000-0000-000000000000"]);
 

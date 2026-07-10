@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { listInvoices } from "@/server/queries/invoices";
 import { formatINR } from "@/lib/money";
+import { VOUCHER_TYPES, type VoucherTypeKey } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 
 export const metadata = { title: "Invoices · GST Billing" };
@@ -23,27 +25,77 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
   draft: "secondary",
 };
 
-export default async function InvoicesPage() {
-  const invoices = await listInvoices();
+/** Tabs across the top of the list — "all" plus every voucher type. */
+const TABS: { key: "all" | VoucherTypeKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "invoice", label: "Invoices" },
+  { key: "quotation", label: "Quotations" },
+  { key: "proforma", label: "Proforma" },
+  { key: "delivery_challan", label: "Challans" },
+  { key: "sales_return", label: "Sales Returns" },
+  { key: "credit_note", label: "Credit Notes" },
+  { key: "purchase_order", label: "POs" },
+  { key: "purchase_return", label: "Purchase Returns" },
+  { key: "debit_note", label: "Debit Notes" },
+];
+
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>;
+}) {
+  const { type } = await searchParams;
+  const active: "all" | VoucherTypeKey =
+    type && type in VOUCHER_TYPES ? (type as VoucherTypeKey) : "all";
+
+  const invoices = await listInvoices(
+    active === "all" ? undefined : { voucherType: active },
+  );
+
+  const newHref =
+    active === "all" || active === "invoice"
+      ? "/invoices/new"
+      : `/invoices/new?type=${active}`;
+
   return (
     <div>
       <PageHeader
-        title="Invoices"
-        description="Sales invoices and purchase bills."
+        title="Sales & Purchases"
+        description="Invoices, quotations, returns, notes, challans and POs."
         action={
           <Button asChild>
-            <Link href="/invoices/new">
-              <Plus className="size-4" /> New invoice
+            <Link href={newHref}>
+              <Plus className="size-4" /> New{" "}
+              {active === "all" ? "invoice" : VOUCHER_TYPES[active].shortLabel.toLowerCase()}
             </Link>
           </Button>
         }
       />
+
+      {/* Voucher-type tabs — horizontally scrollable on mobile. */}
+      <div className="mb-4 flex gap-1 overflow-x-auto pb-1">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={t.key === "all" ? "/invoices" : `/invoices?type=${t.key}`}
+            className={cn(
+              "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+              active === t.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
       {invoices.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
-          No invoices yet. Create your first one.
+          Nothing here yet. Create your first one.
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -65,16 +117,26 @@ export default async function InvoicesPage() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{inv.invoice_date}</TableCell>
                   <TableCell>{inv.party_name ?? "—"}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">
-                    {inv.direction}
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
+                    {VOUCHER_TYPES[inv.voucher_type]?.shortLabel ?? inv.voucher_type}
+                    {inv.voucher_type === "invoice" && inv.direction === "purchase"
+                      ? " (Purchase)"
+                      : null}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatINR(inv.total_paise)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={STATUS_VARIANT[inv.status] ?? "secondary"} className="capitalize">
-                      {inv.status}
-                    </Badge>
+                    {VOUCHER_TYPES[inv.voucher_type]?.ledger === 0 ? (
+                      <Badge variant="secondary">Open</Badge>
+                    ) : (
+                      <Badge
+                        variant={STATUS_VARIANT[inv.status] ?? "secondary"}
+                        className="capitalize"
+                      >
+                        {inv.status}
+                      </Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
