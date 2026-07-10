@@ -7,6 +7,7 @@ import {
   type GstLineInput,
 } from "@/lib/gst";
 import { formatINR } from "@/lib/money";
+import { publicEnv } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -215,7 +216,7 @@ export async function POST(req: NextRequest) {
         .eq("id", rec.id);
 
       if (rec.auto_share && party.phone) {
-        const pdfUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/invoices/${invoice.id}/pdf`;
+        const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoice.id}/pdf`;
         await sendNotification({
           tenantId: rec.tenant_id,
           type: "invoice_generated",

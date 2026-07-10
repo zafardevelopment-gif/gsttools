@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { toast } from "sonner";
 import { FileText, MessageCircle, Mail, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,17 +27,35 @@ export function ShareBar({
   partyPhone?: string | null;
   partyEmail?: string | null;
 }) {
-  const message = `Hello, here is invoice ${invoiceNumber} from ${businessName}. Amount: ${totalLabel}. View/Download: ${pdfUrl}`;
+  // The server-built URL can say "localhost" when NEXT_PUBLIC_SITE_URL isn't
+  // set on the host, so: render a RELATIVE href (the browser resolves it), and
+  // build absolute links from window.location at click time.
+  const pdfPath = pdfUrl.startsWith("http") ? new URL(pdfUrl).pathname : pdfUrl;
 
-  const wa = waNumber(partyPhone);
-  const whatsappHref = `https://wa.me/${wa}?text=${encodeURIComponent(message)}`;
-  const mailtoHref = `mailto:${partyEmail ?? ""}?subject=${encodeURIComponent(
-    `Invoice ${invoiceNumber} from ${businessName}`,
-  )}&body=${encodeURIComponent(message)}`;
+  const absolutePdfUrl = () =>
+    new URL(pdfPath, window.location.origin).toString();
+
+  const message = () =>
+    `Hello, here is invoice ${invoiceNumber} from ${businessName}. Amount: ${totalLabel}. View/Download: ${absolutePdfUrl()}`;
+
+  function openWhatsapp() {
+    const wa = waNumber(partyPhone);
+    window.open(
+      `https://wa.me/${wa}?text=${encodeURIComponent(message())}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  }
+
+  function openEmail() {
+    window.location.href = `mailto:${partyEmail ?? ""}?subject=${encodeURIComponent(
+      `Invoice ${invoiceNumber} from ${businessName}`,
+    )}&body=${encodeURIComponent(message())}`;
+  }
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(pdfUrl);
+      await navigator.clipboard.writeText(absolutePdfUrl());
       toast.success("Invoice link copied.");
     } catch {
       toast.error("Could not copy link.");
@@ -48,19 +65,15 @@ export function ShareBar({
   return (
     <div className="flex flex-wrap gap-2">
       <Button asChild size="sm" variant="outline">
-        <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+        <a href={pdfPath} target="_blank" rel="noopener noreferrer">
           <FileText className="size-4" /> PDF / Print
         </a>
       </Button>
-      <Button asChild size="sm" variant="outline">
-        <Link href={whatsappHref} target="_blank" rel="noopener noreferrer">
-          <MessageCircle className="size-4" /> WhatsApp
-        </Link>
+      <Button size="sm" variant="outline" onClick={openWhatsapp}>
+        <MessageCircle className="size-4" /> WhatsApp
       </Button>
-      <Button asChild size="sm" variant="outline">
-        <a href={mailtoHref}>
-          <Mail className="size-4" /> Email
-        </a>
+      <Button size="sm" variant="outline" onClick={openEmail}>
+        <Mail className="size-4" /> Email
       </Button>
       <Button size="sm" variant="outline" onClick={copyLink}>
         <Link2 className="size-4" /> Copy link

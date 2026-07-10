@@ -1,105 +1,141 @@
 import { formatINR } from "@/lib/money";
-import { STATE_CODE_TO_NAME } from "@/lib/constants";
+import { STATE_CODE_TO_NAME, INVOICE_THEMES, type InvoiceThemeKey } from "@/lib/constants";
 import type { FullInvoice } from "@/server/queries/invoices";
 
 /**
  * Presentational, print-friendly invoice. Pure (no client hooks) so it renders
- * on the server and inside the print route. Tailwind `print:` utilities keep it
- * clean on paper.
+ * on the server and inside the print route. Uses the invoice's selected theme
+ * accent so the on-screen view matches the PDF. Tailwind `print:` utilities
+ * keep it clean on paper.
  */
 export function InvoiceView({ data }: { data: FullInvoice }) {
   const { invoice, items, party, tenant } = data;
   const isGst = invoice.invoice_type === "gst";
   const interstate = invoice.is_interstate;
   const balanceDue = invoice.total_paise - invoice.amount_paid_paise;
+  const theme =
+    INVOICE_THEMES[(invoice.template as InvoiceThemeKey) in INVOICE_THEMES
+      ? (invoice.template as InvoiceThemeKey)
+      : "classic"];
+
+  const isPaid = invoice.status === "paid";
 
   return (
     <div className="mx-auto max-w-3xl bg-white p-8 text-sm text-zinc-900 print:p-0">
       {/* Header */}
-      <div className="flex items-start justify-between border-b pb-4">
+      <div
+        className="flex items-start justify-between border-b-2 pb-5"
+        style={{ borderColor: theme.accent }}
+      >
         <div>
-          <h1 className="text-xl font-bold">{tenant.name}</h1>
-          {tenant.address_line1 && <p>{tenant.address_line1}</p>}
-          {(tenant.city || tenant.state || tenant.pincode) && (
-            <p>
-              {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
-            </p>
-          )}
-          {tenant.gstin && <p>GSTIN: {tenant.gstin}</p>}
-          {tenant.phone && <p>Ph: {tenant.phone}</p>}
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: theme.accent }}>
+            {tenant.name}
+          </h1>
+          <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-zinc-600">
+            {tenant.address_line1 && <p>{tenant.address_line1}</p>}
+            {(tenant.city || tenant.state || tenant.pincode) && (
+              <p>
+                {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
+              </p>
+            )}
+            {tenant.gstin && (
+              <p className="font-medium text-zinc-800">GSTIN: {tenant.gstin}</p>
+            )}
+            {tenant.phone && <p>Ph: {tenant.phone}</p>}
+          </div>
         </div>
         <div className="text-right">
-          <h2 className="text-lg font-semibold">
-            {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
-          </h2>
-          <p className="font-medium">{invoice.invoice_number}</p>
-          <p>Date: {invoice.invoice_date}</p>
-          {invoice.due_date && <p>Due: {invoice.due_date}</p>}
+          <span
+            className="inline-block rounded-md px-3 py-1 text-xs font-bold uppercase tracking-widest text-white"
+            style={{ backgroundColor: theme.accent }}
+          >
+            {invoice.direction === "purchase" ? "Purchase Bill" : "Tax Invoice"}
+          </span>
+          <p className="mt-2 text-base font-bold tabular-nums">{invoice.invoice_number}</p>
+          <div className="mt-1 space-y-0.5 text-xs text-zinc-600">
+            <p>Date: {invoice.invoice_date}</p>
+            {invoice.due_date && <p>Due: {invoice.due_date}</p>}
+            {invoice.eway_bill_no && <p>e-Way Bill: {invoice.eway_bill_no}</p>}
+          </div>
+          {isPaid && (
+            <span className="mt-2 inline-block rounded border-2 border-green-600 px-2 py-0.5 text-xs font-bold uppercase tracking-widest text-green-600">
+              Paid
+            </span>
+          )}
         </div>
       </div>
 
       {/* Party */}
-      <div className="grid grid-cols-2 gap-4 py-4">
-        <div>
-          <p className="text-xs font-semibold uppercase text-zinc-500">
-            {invoice.direction === "purchase" ? "Supplier" : "Bill to"}
+      <div className="grid grid-cols-2 gap-4 py-5">
+        <div className="rounded-lg bg-zinc-50 p-3 print:bg-transparent print:p-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+            {invoice.direction === "purchase" ? "Supplier" : "Bill To"}
           </p>
           {party ? (
-            <>
-              <p className="font-medium">{party.name}</p>
-              {party.billing_address && <p>{party.billing_address}</p>}
-              {party.gstin && <p>GSTIN: {party.gstin}</p>}
-              {party.phone && <p>Ph: {party.phone}</p>}
-            </>
+            <div className="mt-1 space-y-0.5">
+              <p className="text-base font-semibold">{party.name}</p>
+              {party.billing_address && (
+                <p className="text-xs text-zinc-600">{party.billing_address}</p>
+              )}
+              {party.gstin && <p className="text-xs text-zinc-600">GSTIN: {party.gstin}</p>}
+              {party.phone && <p className="text-xs text-zinc-600">Ph: {party.phone}</p>}
+            </div>
           ) : (
-            <p className="text-zinc-500">Cash / walk-in</p>
+            <p className="mt-1 font-medium text-zinc-500">Cash / walk-in</p>
           )}
         </div>
-        <div className="text-right">
+        <div className="self-center text-right text-xs text-zinc-600">
           {invoice.place_of_supply_state && (
             <p>
-              <span className="text-zinc-500">Place of supply: </span>
+              <span className="text-zinc-400">Place of supply: </span>
               {STATE_CODE_TO_NAME[invoice.place_of_supply_state] ??
                 invoice.place_of_supply_state}
             </p>
           )}
-          <p className="text-zinc-500">{isGst ? "GST Invoice" : "Non-GST"}</p>
+          <p className="mt-0.5">
+            {isGst ? (interstate ? "Inter-state · IGST" : "Intra-state · CGST + SGST") : "Non-GST"}
+          </p>
         </div>
       </div>
 
       {/* Items */}
       <table className="w-full border-collapse text-left">
         <thead>
-          <tr className="border-y bg-zinc-50 text-xs uppercase text-zinc-600">
-            <th className="p-2">#</th>
-            <th className="p-2">Item</th>
-            {isGst && <th className="p-2">HSN/SAC</th>}
-            <th className="p-2 text-right">Qty</th>
-            <th className="p-2 text-right">Rate</th>
-            {isGst && <th className="p-2 text-right">GST%</th>}
-            <th className="p-2 text-right">Amount</th>
+          <tr
+            className="text-[11px] uppercase tracking-wider text-white"
+            style={{ backgroundColor: theme.accent }}
+          >
+            <th className="rounded-l-md p-2.5 font-semibold">#</th>
+            <th className="p-2.5 font-semibold">Item</th>
+            {isGst && <th className="p-2.5 font-semibold">HSN/SAC</th>}
+            <th className="p-2.5 text-right font-semibold">Qty</th>
+            <th className="p-2.5 text-right font-semibold">Rate</th>
+            {isGst && <th className="p-2.5 text-right font-semibold">GST%</th>}
+            <th className="rounded-r-md p-2.5 text-right font-semibold">Amount</th>
           </tr>
         </thead>
         <tbody>
           {items.map((it, i) => (
-            <tr key={it.id} className="border-b">
-              <td className="p-2">{i + 1}</td>
-              <td className="p-2">{it.name}</td>
-              {isGst && <td className="p-2">{it.hsn_sac ?? "—"}</td>}
-              <td className="p-2 text-right tabular-nums">
+            <tr key={it.id} className="border-b border-zinc-100 even:bg-zinc-50/60">
+              <td className="p-2.5 text-zinc-400">{i + 1}</td>
+              <td className="p-2.5 font-medium">{it.name}</td>
+              {isGst && <td className="p-2.5 text-zinc-500">{it.hsn_sac ?? "—"}</td>}
+              <td className="p-2.5 text-right tabular-nums">
                 {it.qty} {it.unit}
               </td>
-              <td className="p-2 text-right tabular-nums">{formatINR(it.rate_paise)}</td>
-              {isGst && <td className="p-2 text-right tabular-nums">{it.tax_rate}%</td>}
-              <td className="p-2 text-right tabular-nums">{formatINR(it.amount_paise)}</td>
+              <td className="p-2.5 text-right tabular-nums">{formatINR(it.rate_paise)}</td>
+              {isGst && <td className="p-2.5 text-right tabular-nums">{it.tax_rate}%</td>}
+              <td className="p-2.5 text-right font-medium tabular-nums">
+                {formatINR(it.amount_paise)}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
       {/* Totals */}
-      <div className="mt-4 flex justify-end">
-        <div className="w-64 space-y-1">
+      <div className="mt-5 flex justify-end">
+        <div className="w-72 space-y-1.5">
           <Row label="Taxable value" value={formatINR(invoice.taxable_value_paise)} />
           {invoice.discount_paise > 0 && (
             <Row label="Discount" value={`- ${formatINR(invoice.discount_paise)}`} />
@@ -119,32 +155,58 @@ export function InvoiceView({ data }: { data: FullInvoice }) {
           {invoice.round_off_paise !== 0 && (
             <Row label="Round off" value={formatINR(invoice.round_off_paise)} />
           )}
-          <div className="flex justify-between border-t pt-1 font-bold">
+          <div
+            className="flex items-center justify-between rounded-lg px-3 py-2 text-base font-bold text-white"
+            style={{ backgroundColor: theme.accent }}
+          >
             <span>Total</span>
-            <span>{formatINR(invoice.total_paise)}</span>
+            <span className="tabular-nums">{formatINR(invoice.total_paise)}</span>
           </div>
           {invoice.amount_paid_paise > 0 && (
             <>
               <Row label="Paid" value={formatINR(invoice.amount_paid_paise)} />
-              <Row label="Balance due" value={formatINR(balanceDue)} />
+              <div className="flex justify-between font-semibold">
+                <span>Balance due</span>
+                <span className="tabular-nums">{formatINR(balanceDue)}</span>
+              </div>
             </>
           )}
         </div>
       </div>
 
-      {(invoice.notes || invoice.terms) && (
-        <div className="mt-6 space-y-2 border-t pt-4 text-xs text-zinc-600">
-          {invoice.notes && <p><span className="font-semibold">Notes: </span>{invoice.notes}</p>}
-          {invoice.terms && <p><span className="font-semibold">Terms: </span>{invoice.terms}</p>}
+      {(invoice.notes || invoice.terms || invoice.irn) && (
+        <div className="mt-8 space-y-1.5 border-t pt-4 text-xs text-zinc-500">
+          {invoice.irn && (
+            <p className="break-all">
+              <span className="font-semibold text-zinc-700">IRN: </span>
+              {invoice.irn}
+            </p>
+          )}
+          {invoice.notes && (
+            <p>
+              <span className="font-semibold text-zinc-700">Notes: </span>
+              {invoice.notes}
+            </p>
+          )}
+          {invoice.terms && (
+            <p>
+              <span className="font-semibold text-zinc-700">Terms: </span>
+              {invoice.terms}
+            </p>
+          )}
         </div>
       )}
+
+      <p className="mt-8 text-center text-[10px] uppercase tracking-widest text-zinc-300 print:text-zinc-400">
+        Thank you for your business
+      </p>
     </div>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
+    <div className="flex justify-between px-3">
       <span className="text-zinc-500">{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>

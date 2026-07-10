@@ -7,6 +7,7 @@ import {
   type GstLineInput,
 } from "@/lib/gst";
 import { formatINR, rupeesToPaise } from "@/lib/money";
+import { publicEnv } from "@/lib/env";
 
 /**
  * WhatsApp bill engine (DukaanMitra B01) — the server side of "bolke bill
@@ -317,7 +318,7 @@ export async function createWhatsappBill(
   }
 
   // Auto-share PDF to the customer (B01).
-  const pdfUrl = `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/invoices/${invoice.id}/pdf`;
+  const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoice.id}/pdf`;
   if ((input.autoShare ?? true) && party?.phone) {
     sendNotification({
       tenantId: input.tenantId,
