@@ -37,9 +37,9 @@ export async function createGodownAction(
 }
 
 const transferSchema = z.object({
-  itemId: z.string().uuid(),
-  fromGodownId: z.string().uuid(),
-  toGodownId: z.string().uuid(),
+  itemId: z.guid(),
+  fromGodownId: z.guid(),
+  toGodownId: z.guid(),
   qty: z.coerce.number().positive("Qty must be > 0."),
   notes: z.string().trim().optional(),
 });
@@ -100,8 +100,8 @@ export async function transferStockAction(
 }
 
 const assignSchema = z.object({
-  itemId: z.string().uuid(),
-  godownId: z.string().uuid(),
+  itemId: z.guid(),
+  godownId: z.guid(),
   qty: z.coerce.number().positive("Qty must be > 0."),
 });
 

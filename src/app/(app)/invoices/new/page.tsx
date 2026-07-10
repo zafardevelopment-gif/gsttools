@@ -46,6 +46,7 @@ export default async function NewInvoicePage({
           type: p.type,
           state_code: p.state_code,
           gstin: p.gstin,
+          pricing_tier: p.pricing_tier,
         }))}
         items={items.map((i) => ({
           id: i.id,
@@ -54,6 +55,7 @@ export default async function NewInvoicePage({
           unit: i.unit,
           sale_price_paise: i.sale_price_paise,
           purchase_price_paise: i.purchase_price_paise,
+          wholesale_price_paise: i.wholesale_price_paise,
           tax_rate: i.tax_rate,
           type: i.type,
         }))}

@@ -36,6 +36,7 @@ export default async function PosPage() {
             hsn_sac: i.hsn_sac,
             unit: i.unit,
             sale_price_paise: i.sale_price_paise,
+            wholesale_price_paise: i.wholesale_price_paise,
             tax_rate: i.tax_rate,
             stock_qty: i.stock_qty,
             type: i.type,
@@ -45,6 +46,7 @@ export default async function PosPage() {
           name: p.name,
           state_code: p.state_code,
           gstin: p.gstin,
+          pricing_tier: p.pricing_tier,
         }))}
       />
     </div>

@@ -94,6 +94,11 @@ export function ReportToolbar({
           <Button onClick={() => apply()}>Apply</Button>
         </>
       )}
+      <Button variant="outline" asChild>
+        <a href={`/api/tally-export?from=${f}&to=${to2}`} download>
+          Tally export
+        </a>
+      </Button>
     </div>
   );
 }

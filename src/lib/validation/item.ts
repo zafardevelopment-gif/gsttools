@@ -31,6 +31,8 @@ export const itemFormSchema = z.object({
   barcode: z.string().trim().optional(),
   // MRP in rupees (converted to paise in the action).
   mrp: numberish(0).refine((n) => n >= 0, "MRP can't be negative."),
+  // Wholesale sale price in rupees (0 = use retail price).
+  wholesale_price: numberish(0).refine((n) => n >= 0, "Price can't be negative."),
   description: z.string().trim().optional(),
   alt_unit: z.string().trim().optional(),
   // 1 alt_unit = factor × unit (e.g. 1 BOX = 12 PCS).

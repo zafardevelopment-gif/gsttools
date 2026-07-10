@@ -12,7 +12,7 @@ export const expenseFormSchema = z.object({
   amount: numberish(0).refine((n) => n > 0, "Amount must be greater than 0."),
   expense_date: z.string().min(1),
   payment_mode: z.enum(PAYMENT_MODES).default("cash"),
-  partyId: z.string().uuid().nullable().optional(),
+  partyId: z.guid().nullable().optional(),
   notes: z.string().trim().optional(),
 });
 

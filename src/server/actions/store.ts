@@ -18,7 +18,7 @@ const orderSchema = z.object({
   lines: z
     .array(
       z.object({
-        itemId: z.string().uuid(),
+        itemId: z.guid(),
         qty: z.coerce.number().positive(),
       }),
     )

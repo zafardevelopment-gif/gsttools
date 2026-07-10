@@ -5,6 +5,7 @@ import { deleteInvoiceAction } from "@/server/actions/invoices";
 import { InvoiceView } from "@/components/invoice/invoice-view";
 import { ShareBar } from "@/components/invoice/share-bar";
 import { ConfirmDelete } from "@/components/confirm-delete";
+import { EInvoicePanel } from "./einvoice-panel";
 import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
 import { formatINR } from "@/lib/money";
@@ -53,6 +54,17 @@ export default async function InvoiceDetailPage({
           />
         </div>
       </div>
+      {data.invoice.direction === "sale" &&
+        data.invoice.voucher_type === "invoice" &&
+        data.invoice.invoice_type === "gst" &&
+        data.invoice.status !== "draft" && (
+          <EInvoicePanel
+            invoiceId={id}
+            irn={data.invoice.irn}
+            irnGeneratedAt={data.invoice.irn_generated_at}
+            ewayBillNo={data.invoice.eway_bill_no}
+          />
+        )}
       <div className="rounded-lg border">
         <InvoiceView data={data} />
       </div>

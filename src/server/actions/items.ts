@@ -24,6 +24,7 @@ function parseItem(formData: FormData) {
     low_stock_level: formData.get("low_stock_level") ?? 0,
     barcode: formData.get("barcode") ?? undefined,
     mrp: formData.get("mrp") ?? 0,
+    wholesale_price: formData.get("wholesale_price") ?? 0,
     description: formData.get("description") ?? undefined,
     alt_unit: formData.get("alt_unit") ?? undefined,
     alt_unit_factor: formData.get("alt_unit_factor") ?? 0,
@@ -35,6 +36,7 @@ function extraItemColumns(v: ItemFormValues) {
   return {
     barcode: v.barcode || null,
     mrp_paise: rupeesToPaise(v.mrp),
+    wholesale_price_paise: rupeesToPaise(v.wholesale_price),
     description: v.description || null,
     alt_unit: v.alt_unit || null,
     alt_unit_factor: v.alt_unit && v.alt_unit_factor > 0 ? v.alt_unit_factor : null,

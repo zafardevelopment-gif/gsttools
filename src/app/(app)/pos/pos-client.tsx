@@ -27,6 +27,7 @@ export type PosItem = {
   hsn_sac: string | null;
   unit: string;
   sale_price_paise: number;
+  wholesale_price_paise: number;
   tax_rate: number;
   stock_qty: number;
   type: string;
@@ -37,6 +38,7 @@ export type PosParty = {
   name: string;
   state_code: string | null;
   gstin: string | null;
+  pricing_tier: "retail" | "wholesale";
 };
 
 type CartLine = {
@@ -133,6 +135,12 @@ export function PosClient({
         ),
       });
     } else {
+      // Wholesale parties get the wholesale price (falls back to retail).
+      const billParty = parties.find((p) => p.id === bill.partyId);
+      const ratePaise =
+        billParty?.pricing_tier === "wholesale" && item.wholesale_price_paise > 0
+          ? item.wholesale_price_paise
+          : item.sale_price_paise;
       updateBill({
         lines: [
           ...bill.lines,
@@ -142,7 +150,7 @@ export function PosClient({
             hsn_sac: item.hsn_sac ?? "",
             unit: item.unit,
             qty: 1,
-            rate: paiseToRupees(item.sale_price_paise),
+            rate: paiseToRupees(ratePaise),
             taxRate: item.tax_rate,
           },
         ],

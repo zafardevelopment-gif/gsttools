@@ -8,7 +8,7 @@ import { requireActiveContext } from "@/lib/tenant";
 export type ActionResult = { ok?: true; error?: string };
 
 const statusSchema = z.object({
-  orderId: z.string().uuid(),
+  orderId: z.guid(),
   status: z.enum(["new", "confirmed", "dispatched", "delivered", "cancelled"]),
 });
 

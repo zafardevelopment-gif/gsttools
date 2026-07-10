@@ -7,7 +7,7 @@ const numberish = (def = 0) =>
   });
 
 export const invoiceLineSchema = z.object({
-  itemId: z.string().uuid().nullable().optional(),
+  itemId: z.guid().nullable().optional(),
   name: z.string().trim().min(1, "Item name is required."),
   hsn_sac: z.string().trim().optional(),
   unit: z.string().trim().default("PCS"),
@@ -36,9 +36,9 @@ export const invoiceInputSchema = z.object({
   voucherType: voucherTypeSchema.default("invoice"),
   invoiceType: z.enum(["gst", "non_gst"]).default("gst"),
   /** For returns/notes: the original invoice this voucher is issued against. */
-  againstInvoiceId: z.string().uuid().nullable().optional(),
+  againstInvoiceId: z.guid().nullable().optional(),
   paymentTermsDays: numberish(0).optional(),
-  partyId: z.string().uuid().nullable().optional(),
+  partyId: z.guid().nullable().optional(),
   invoiceNumber: z.string().trim().optional(),
   invoiceDate: z.string().min(1),
   dueDate: z.string().optional().nullable(),

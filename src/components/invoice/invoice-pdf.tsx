@@ -138,6 +138,9 @@ export function InvoicePdf({
             <Text style={s.bold}>{invoice.invoice_number}</Text>
             <Text>Date: {invoice.invoice_date}</Text>
             {invoice.due_date ? <Text>Due: {invoice.due_date}</Text> : null}
+            {invoice.eway_bill_no ? (
+              <Text>e-Way Bill: {invoice.eway_bill_no}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -228,6 +231,11 @@ export function InvoicePdf({
           ) : null}
         </View>
 
+        {invoice.irn ? (
+          <View style={s.section}>
+            <Text style={s.muted}>IRN: {invoice.irn}</Text>
+          </View>
+        ) : null}
         {invoice.notes ? (
           <View style={s.section}>
             <Text style={s.muted}>Notes: {invoice.notes}</Text>

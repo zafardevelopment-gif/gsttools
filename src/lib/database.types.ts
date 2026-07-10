@@ -105,6 +105,7 @@ export type PartyRow = Timestamps & {
   bank_account_number: string | null;
   bank_ifsc: string | null;
   share_token: string;
+  pricing_tier: "retail" | "wholesale";
 }
 
 export type ItemRow = Timestamps & {
@@ -125,6 +126,7 @@ export type ItemRow = Timestamps & {
   is_active: boolean;
   barcode: string | null;
   mrp_paise: number;
+  wholesale_price_paise: number;
   alt_unit: string | null;
   alt_unit_factor: number | null;
   description: string | null;
@@ -175,6 +177,11 @@ export type InvoiceRow = Timestamps & {
   payment_terms_days: number | null;
   is_cancelled: boolean;
   cancelled_reason: string | null;
+  irn: string | null;
+  irn_generated_at: string | null;
+  irn_qr_payload: string | null;
+  eway_bill_no: string | null;
+  eway_generated_at: string | null;
 }
 
 export type InvoiceItemRow = {

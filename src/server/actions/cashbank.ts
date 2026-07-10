@@ -46,7 +46,7 @@ export async function createBankAccountAction(
 
 const adjustmentSchema = z.object({
   /** null/"cash" = cash-in-hand ledger */
-  accountId: z.string().uuid().nullable().optional(),
+  accountId: z.guid().nullable().optional(),
   direction: z.enum(["in", "out"]),
   amount: z.coerce.number().positive("Amount must be > 0."),
   txnDate: z.string().min(1),
@@ -80,8 +80,8 @@ export async function addAdjustmentAction(
 
 const transferSchema = z
   .object({
-    fromAccountId: z.string().uuid().nullable(),
-    toAccountId: z.string().uuid().nullable(),
+    fromAccountId: z.guid().nullable(),
+    toAccountId: z.guid().nullable(),
     amount: z.coerce.number().positive("Amount must be > 0."),
     txnDate: z.string().min(1),
     notes: z.string().trim().optional(),

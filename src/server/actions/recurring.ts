@@ -8,13 +8,13 @@ import { requireActiveContext } from "@/lib/tenant";
 export type ActionResult = { ok?: true; error?: string };
 
 const lineSchema = z.object({
-  itemId: z.string().uuid(),
+  itemId: z.guid(),
   qty: z.coerce.number().positive(),
 });
 
 const recurringSchema = z.object({
   name: z.string().trim().min(1, "Name is required."),
-  partyId: z.string().uuid({ message: "Select a party." }),
+  partyId: z.guid({ error: "Select a party." }),
   frequency: z.enum(["daily", "weekly", "monthly"]),
   nextRunDate: z.string().min(1),
   autoShare: z.boolean().default(true),

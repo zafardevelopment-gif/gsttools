@@ -37,6 +37,7 @@ export type PartyOption = {
   type: string;
   state_code: string | null;
   gstin: string | null;
+  pricing_tier?: "retail" | "wholesale";
 };
 export type ItemOption = {
   id: string;
@@ -45,6 +46,7 @@ export type ItemOption = {
   unit: string;
   sale_price_paise: number;
   purchase_price_paise: number;
+  wholesale_price_paise?: number;
   tax_rate: number;
   type: string;
 };
@@ -137,8 +139,14 @@ export function InvoiceForm({
   function pickItem(key: number, itemId: string) {
     const it = items.find((i) => i.id === itemId);
     if (!it) return;
+    // Wholesale parties get the wholesale price (falls back to retail).
+    const isWholesale = party?.pricing_tier === "wholesale";
+    const salePaise =
+      isWholesale && (it.wholesale_price_paise ?? 0) > 0
+        ? it.wholesale_price_paise!
+        : it.sale_price_paise;
     const ratePaise =
-      direction === "purchase" ? it.purchase_price_paise : it.sale_price_paise;
+      direction === "purchase" ? it.purchase_price_paise : salePaise;
     updateLine(key, {
       itemId: it.id,
       name: it.name,

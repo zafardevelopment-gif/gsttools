@@ -174,9 +174,28 @@ export function ItemFormDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
+              <Label htmlFor="wholesale_price">Wholesale price (₹)</Label>
+              <Input
+                id="wholesale_price"
+                name="wholesale_price"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0 = retail hi lagega"
+                defaultValue={
+                  item && item.wholesale_price_paise > 0
+                    ? paiseToRupees(item.wholesale_price_paise)
+                    : ""
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="barcode">Barcode</Label>
               <Input id="barcode" name="barcode" defaultValue={item?.barcode ?? ""} />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="mrp">MRP (₹)</Label>
               <Input

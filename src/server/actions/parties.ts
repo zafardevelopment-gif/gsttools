@@ -22,6 +22,7 @@ function parseParty(formData: FormData) {
     opening_balance: formData.get("opening_balance") ?? 0,
     pan: formData.get("pan") ?? "",
     category: formData.get("category") ?? undefined,
+    pricing_tier: formData.get("pricing_tier") ?? "retail",
     contact_person: formData.get("contact_person") ?? undefined,
     credit_period_days: formData.get("credit_period_days") ?? 0,
     credit_limit: formData.get("credit_limit") ?? 0,
@@ -33,6 +34,7 @@ function extraPartyColumns(v: PartyFormValues) {
   return {
     pan: v.pan || null,
     category: v.category || null,
+    pricing_tier: v.pricing_tier,
     contact_person: v.contact_person || null,
     credit_period_days: Math.round(v.credit_period_days),
     credit_limit_paise: rupeesToPaise(v.credit_limit),

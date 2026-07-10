@@ -9,8 +9,8 @@ const numberish = (def = 0) =>
 
 export const paymentInputSchema = z.object({
   direction: z.enum(["in", "out"]),
-  partyId: z.string().uuid({ message: "Select a party." }),
-  invoiceId: z.string().uuid().nullable().optional(),
+  partyId: z.guid({ error: "Select a party." }),
+  invoiceId: z.guid().nullable().optional(),
   /** Amount in rupees (converted to paise in the action). */
   amount: numberish(0).refine((n) => n > 0, "Amount must be greater than 0."),
   mode: z.enum(PAYMENT_MODES).default("cash"),

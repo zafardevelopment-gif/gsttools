@@ -44,7 +44,7 @@ export async function createStaffAction(
 }
 
 const attendanceSchema = z.object({
-  staffId: z.string().uuid(),
+  staffId: z.guid(),
   day: z.string().min(1),
   status: z.enum(["present", "absent", "half_day", "overtime"]),
   overtimeHours: z.coerce.number().min(0).default(0),
@@ -78,7 +78,7 @@ export async function markAttendanceAction(
 }
 
 const ledgerSchema = z.object({
-  staffId: z.string().uuid(),
+  staffId: z.guid(),
   kind: z.enum(["advance", "loan", "deduction", "repayment"]),
   amount: z.coerce.number().positive("Amount must be > 0."),
   entryDate: z.string().min(1),

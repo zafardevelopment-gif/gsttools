@@ -40,6 +40,7 @@ export const partyFormSchema = z
         "Invalid PAN (e.g. ABCDE1234F).",
       ),
     category: z.string().trim().optional(),
+    pricing_tier: z.enum(["retail", "wholesale"]).default("retail"),
     contact_person: z.string().trim().optional(),
     credit_period_days: numberish(0).refine((n) => n >= 0, "Can't be negative."),
     // Credit limit in rupees (converted to paise in the action).

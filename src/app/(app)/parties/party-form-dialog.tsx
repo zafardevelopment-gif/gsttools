@@ -42,6 +42,9 @@ export function PartyFormDialog({
   const [pending, startTransition] = useTransition();
   const [type, setType] = useState<PartyRow["type"]>(party?.type ?? "customer");
   const [stateCode, setStateCode] = useState(party?.state_code ?? "");
+  const [pricingTier, setPricingTier] = useState<"retail" | "wholesale">(
+    party?.pricing_tier ?? "retail",
+  );
   const isEdit = !!party;
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -49,6 +52,7 @@ export function PartyFormDialog({
     const fd = new FormData(e.currentTarget);
     fd.set("type", type);
     fd.set("state_code", stateCode);
+    fd.set("pricing_tier", pricingTier);
     startTransition(async () => {
       const res = isEdit
         ? await updatePartyAction(party!.id, fd)
@@ -178,10 +182,24 @@ export function PartyFormDialog({
               <Input
                 id="party_category"
                 name="category"
-                placeholder="Retail / Wholesale…"
+                placeholder="Grocery / Hardware…"
                 defaultValue={party?.category ?? ""}
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Pricing tier</Label>
+            <Select
+              value={pricingTier}
+              onValueChange={(v) => setPricingTier(v as typeof pricingTier)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="retail">Retail (normal price)</SelectItem>
+                <SelectItem value="wholesale">Wholesale (wholesale price lagega)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
