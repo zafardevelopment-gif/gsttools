@@ -48,13 +48,14 @@ export async function createInvoiceAction(
 
   const supabase = await createClient();
 
-  // Business state (origin of supply).
+  // Business state (origin of supply) + display settings.
   const { data: tenant } = await supabase
     .from("aimunim_tenants")
-    .select("state_code")
+    .select("state_code, invoice_settings")
     .eq("id", tenantId)
     .single();
   const businessState = tenant?.state_code ?? "";
+  const tenantSettings = (tenant?.invoice_settings ?? {}) as { auto_share?: boolean };
 
   // Resolve place of supply + intra/inter-state from the party.
   let placeOfSupply: string | undefined;
@@ -221,7 +222,12 @@ export async function createInvoiceAction(
   // Invoice auto-share: send the PDF link to the party via NotificationService
   // (WhatsApp by default; silently switches to SMS with the tenant setting).
   // Fire-and-forget — a messaging failure must never block the sale.
-  if (v.voucherType === "invoice" && status !== "draft" && v.partyId) {
+  if (
+    v.voucherType === "invoice" &&
+    status !== "draft" &&
+    v.partyId &&
+    tenantSettings.auto_share !== false
+  ) {
     const { data: party } = await supabase
       .from("aimunim_parties")
       .select("name, phone")

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GST_RATES, UNITS } from "@/lib/constants";
+import { GST_RATES } from "@/lib/constants";
 
 /** Accept a number-like string/number; default 0 when blank. */
 const numberish = (def = 0) =>
@@ -15,7 +15,13 @@ export const itemFormSchema = z.object({
   name: z.string().trim().min(1, "Item name is required."),
   sku: z.string().trim().optional(),
   hsn_sac: z.string().trim().optional(),
-  unit: z.enum(UNITS).default("PCS"),
+  // Free-form so tenant-defined custom units (Settings) also pass validation.
+  unit: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9./-]{1,12}$/, "Invalid unit.")
+    .default("PCS"),
   category: z.string().trim().optional(),
   // Rupee inputs from the form; converted to paise in the action.
   sale_price: numberish(0).refine((n) => n >= 0, "Price can't be negative."),

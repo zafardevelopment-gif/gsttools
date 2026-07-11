@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getInvoice } from "@/server/queries/invoices";
 import { deleteInvoiceAction } from "@/server/actions/invoices";
 import { InvoiceView } from "@/components/invoice/invoice-view";
+import { getInvoiceRenderExtras } from "@/server/invoice-extras";
 import { ShareBar } from "@/components/invoice/share-bar";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EInvoicePanel } from "./einvoice-panel";
@@ -20,6 +21,7 @@ export default async function InvoiceDetailPage({
   const { id } = await params;
   const data = await getInvoice(id);
   if (!data) notFound();
+  const extras = await getInvoiceRenderExtras(data);
 
   async function onDelete() {
     "use server";
@@ -66,7 +68,7 @@ export default async function InvoiceDetailPage({
           />
         )}
       <div className="rounded-lg border">
-        <InvoiceView data={data} />
+        <InvoiceView data={data} extras={extras} />
       </div>
     </div>
   );

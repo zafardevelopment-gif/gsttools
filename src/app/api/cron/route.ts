@@ -80,7 +80,12 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
-  const results = { invoicesCreated: 0, remindersSent: 0, errors: [] as string[] };
+  const results = {
+    invoicesCreated: 0,
+    remindersSent: 0,
+    ownerSummaries: 0,
+    errors: [] as string[],
+  };
 
   // ---- 1. Due recurring invoices ---------------------------------------------
   const { data: due } = await admin
@@ -278,6 +283,63 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {
       results.errors.push(`rule ${rule.id}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // ---- 3. Owner daily summary (tenants with the toggle on) ---------------------
+  const { data: tenants } = await admin
+    .from("aimunim_tenants")
+    .select("id, name, phone, invoice_settings")
+    .not("phone", "is", null);
+
+  for (const t of tenants ?? []) {
+    try {
+      const settings = (t.invoice_settings ?? {}) as { owner_daily_summary?: boolean };
+      if (!settings.owner_daily_summary || !t.phone) continue;
+
+      const [{ data: invoices }, { data: payments }] = await Promise.all([
+        admin
+          .from("aimunim_invoices")
+          .select("total_paise")
+          .eq("tenant_id", t.id)
+          .eq("direction", "sale")
+          .eq("voucher_type", "invoice")
+          .neq("status", "draft")
+          .eq("invoice_date", today),
+        admin
+          .from("aimunim_payments")
+          .select("amount_paise, mode, direction")
+          .eq("tenant_id", t.id)
+          .eq("payment_date", today),
+      ]);
+
+      const salesPaise = (invoices ?? []).reduce((s, i) => s + i.total_paise, 0);
+      const inPaise = (payments ?? [])
+        .filter((p) => p.direction === "in")
+        .reduce((s, p) => s + p.amount_paise, 0);
+      const cashPaise = (payments ?? [])
+        .filter((p) => p.direction === "in" && p.mode === "cash")
+        .reduce((s, p) => s + p.amount_paise, 0);
+      const creditPaise = Math.max(0, salesPaise - inPaise);
+
+      await sendNotification({
+        tenantId: t.id,
+        type: "order_status",
+        recipient: t.phone,
+        body: `${t.name} — aaj (${today}): Sales ${formatINR(salesPaise)} · ${(invoices ?? []).length} bills · Cash ${formatINR(cashPaise)} · Udhar ${formatINR(creditPaise)} · Total received ${formatINR(inPaise)}.`,
+        template: "daily_summary",
+        params: {
+          date: today,
+          sales: (salesPaise / 100).toFixed(2),
+          bills: String((invoices ?? []).length),
+          received: (inPaise / 100).toFixed(2),
+        },
+        entityType: "tenant",
+        entityId: t.id,
+      });
+      results.ownerSummaries += 1;
+    } catch (e) {
+      results.errors.push(`summary ${t.id}: ${e instanceof Error ? e.message : e}`);
     }
   }
 

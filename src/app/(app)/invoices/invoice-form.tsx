@@ -82,12 +82,14 @@ export function InvoiceForm({
   businessStateCode,
   suggestedNumber,
   initialVoucherType = "invoice",
+  initialTheme = "classic",
 }: {
   parties: PartyOption[];
   items: ItemOption[];
   businessStateCode: string;
   suggestedNumber: string;
   initialVoucherType?: VoucherTypeKey;
+  initialTheme?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -108,7 +110,11 @@ export function InvoiceForm({
   const [roundOff, setRoundOff] = useState(true);
   const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
-  const [template, setTemplate] = useState<InvoiceThemeKey>("classic");
+  const [template, setTemplate] = useState<InvoiceThemeKey>(
+    (initialTheme as InvoiceThemeKey) in INVOICE_THEMES
+      ? (initialTheme as InvoiceThemeKey)
+      : "classic",
+  );
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const party = parties.find((p) => p.id === partyId);

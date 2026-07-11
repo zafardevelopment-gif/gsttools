@@ -43,7 +43,28 @@ export type TenantRow = Timestamps & {
   invoice_settings: Json;
   print_settings: Json;
   default_terms: string | null;
+  signature_path: string | null;
+  upi_id: string | null;
+  business_type: string | null;
+  industry_type: string | null;
+  registration_type: string | null;
+  gst_registered: boolean;
+  tds_enabled: boolean;
+  tcs_enabled: boolean;
+  custom_units: string[];
 }
+
+/** Shape of aimunim_tenants.invoice_settings jsonb (display toggles etc.). */
+export type InvoiceSettings = {
+  default_theme?: string;
+  show_party_balance?: boolean;
+  show_phone?: boolean;
+  show_time?: boolean;
+  receiver_signature?: boolean;
+  show_payment_qr?: boolean;
+  auto_share?: boolean; // WhatsApp bill auto-send on create (default true)
+  owner_daily_summary?: boolean; // cron: daily summary to owner's WhatsApp
+};
 
 export type PlanName =
   | "trial"

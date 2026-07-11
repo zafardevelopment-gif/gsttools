@@ -31,10 +31,14 @@ import {
 export function ItemFormDialog({
   item,
   trigger,
+  extraUnits = [],
 }: {
   item?: ItemRow;
   trigger?: React.ReactNode;
+  /** Tenant-defined custom units from Settings (merged with built-ins). */
+  extraUnits?: string[];
 }) {
+  const allUnits = [...new Set([...UNITS, ...extraUnits])];
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -115,7 +119,7 @@ export function ItemFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="max-h-60">
-                  {UNITS.map((u) => (
+                  {allUnits.map((u) => (
                     <SelectItem key={u} value={u}>
                       {u}
                     </SelectItem>

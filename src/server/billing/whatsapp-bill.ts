@@ -138,10 +138,11 @@ export async function createWhatsappBill(
 
   const { data: tenant } = await admin
     .from("aimunim_tenants")
-    .select("state_code, invoice_prefix, name")
+    .select("state_code, invoice_prefix, name, invoice_settings")
     .eq("id", input.tenantId)
     .single();
   if (!tenant) return { error: "Tenant not found." };
+  const tenantSettings = (tenant.invoice_settings ?? {}) as { auto_share?: boolean };
 
   const party = await findOrCreateParty(admin, input.tenantId, input.customer);
   if (paymentMode === "credit" && !party) {
@@ -319,7 +320,7 @@ export async function createWhatsappBill(
 
   // Auto-share PDF to the customer (B01).
   const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoice.id}/pdf`;
-  if ((input.autoShare ?? true) && party?.phone) {
+  if ((input.autoShare ?? tenantSettings.auto_share !== false) && party?.phone) {
     sendNotification({
       tenantId: input.tenantId,
       type: "invoice_generated",

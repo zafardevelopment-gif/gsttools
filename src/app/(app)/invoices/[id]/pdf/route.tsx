@@ -10,6 +10,7 @@ import {
   PAPER_SIZES,
   type PaperSizeKey,
 } from "@/components/invoice/invoice-pdf";
+import { getInvoiceRenderExtras } from "@/server/invoice-extras";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,10 @@ export async function GET(
   const requested = url.searchParams.get("paper") ?? printSettings.paper ?? "A4";
   const paper: PaperSizeKey = requested in PAPER_SIZES ? (requested as PaperSizeKey) : "A4";
 
-  const buffer = await renderToBuffer(<InvoicePdf data={data} paper={paper} />);
+  const extras = await getInvoiceRenderExtras(data);
+  const buffer = await renderToBuffer(
+    <InvoicePdf data={data} paper={paper} extras={extras} />,
+  );
   const filename = `${data.invoice.invoice_number.replace(/[\\/]/g, "-")}.pdf`;
 
   return new Response(new Uint8Array(buffer), {

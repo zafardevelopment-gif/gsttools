@@ -62,6 +62,7 @@ export const UNITS = [
   "PCS",
   "NOS",
   "KG",
+  "QTL",
   "GM",
   "LTR",
   "ML",

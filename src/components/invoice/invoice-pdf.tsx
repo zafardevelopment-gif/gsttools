@@ -10,6 +10,7 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
 } from "@react-pdf/renderer";
 import { formatINR } from "@/lib/money";
@@ -76,16 +77,31 @@ const s = StyleSheet.create({
   },
 });
 
+export type PdfExtras = {
+  settings?: {
+    show_party_balance?: boolean;
+    show_phone?: boolean;
+    show_time?: boolean;
+    receiver_signature?: boolean;
+  };
+  logoUrl?: string | null;
+  signatureUrl?: string | null;
+  qrDataUrl?: string | null;
+};
+
 export function InvoicePdf({
   data,
   paper = "A4",
+  extras = {},
 }: {
   data: FullInvoice;
   paper?: PaperSizeKey;
+  extras?: PdfExtras;
 }) {
   const { invoice, items, party, tenant } = data;
   const isGst = invoice.invoice_type === "gst";
   const interstate = invoice.is_interstate;
+  const opts = extras.settings ?? {};
 
   const theme =
     INVOICE_THEMES[(invoice.template as InvoiceThemeKey) in INVOICE_THEMES
@@ -120,14 +136,22 @@ export function InvoicePdf({
         ) : null}
         {/* Header */}
         <View style={s.between}>
-          <View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {extras.logoUrl ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={extras.logoUrl} style={{ width: 42, height: 42, objectFit: "contain" }} />
+            ) : null}
+            <View>
             <Text style={[s.h1, { color: theme.accent }]}>{tenant.name}</Text>
             {tenant.address_line1 ? <Text>{tenant.address_line1}</Text> : null}
             <Text>
               {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
             </Text>
             {tenant.gstin ? <Text>GSTIN: {tenant.gstin}</Text> : null}
-            {tenant.phone ? <Text>Ph: {tenant.phone}</Text> : null}
+            {tenant.phone && opts.show_phone !== false ? (
+              <Text>Ph: {tenant.phone}</Text>
+            ) : null}
+            </View>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             {!theme.headerBand ? (
@@ -136,7 +160,10 @@ export function InvoicePdf({
               </Text>
             ) : null}
             <Text style={s.bold}>{invoice.invoice_number}</Text>
-            <Text>Date: {invoice.invoice_date}</Text>
+            <Text>
+              Date: {invoice.invoice_date}
+              {opts.show_time ? ` ${invoice.created_at.slice(11, 16)}` : ""}
+            </Text>
             {invoice.due_date ? <Text>Due: {invoice.due_date}</Text> : null}
             {invoice.eway_bill_no ? (
               <Text>e-Way Bill: {invoice.eway_bill_no}</Text>
@@ -229,6 +256,49 @@ export function InvoicePdf({
               />
             </>
           ) : null}
+          {opts.show_party_balance && party ? (
+            <TotalRow
+              label="Party total outstanding"
+              value={money(Math.max(0, party.balance_paise))}
+            />
+          ) : null}
+        </View>
+
+        {/* Payment QR + signatures */}
+        <View style={[s.between, { marginTop: 16, alignItems: "flex-end" }]}>
+          {extras.qrDataUrl ? (
+            <View style={{ alignItems: "center" }}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <Image src={extras.qrDataUrl} style={{ width: 64, height: 64 }} />
+              <Text style={[s.muted, { fontSize: 6 }]}>Scan to pay (UPI)</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+          <View style={{ flexDirection: "row", gap: 24 }}>
+            {opts.receiver_signature ? (
+              <View style={{ alignItems: "center", width: 90 }}>
+                <View style={{ height: 28 }} />
+                <View style={{ borderTopWidth: 1, borderColor: "#a1a1aa", width: "100%" }} />
+                <Text style={[s.muted, { fontSize: 6, marginTop: 2 }]}>
+                  Receiver&apos;s signature
+                </Text>
+              </View>
+            ) : null}
+            {extras.signatureUrl ? (
+              <View style={{ alignItems: "center", width: 90 }}>
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                <Image
+                  src={extras.signatureUrl}
+                  style={{ width: 70, height: 26, objectFit: "contain" }}
+                />
+                <View style={{ borderTopWidth: 1, borderColor: "#a1a1aa", width: "100%" }} />
+                <Text style={[s.muted, { fontSize: 6, marginTop: 2 }]}>
+                  Authorised signatory — {tenant.name}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {invoice.irn ? (

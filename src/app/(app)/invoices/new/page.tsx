@@ -23,8 +23,16 @@ export default async function NewInvoicePage({
   const [parties, items, { data: tenant }] = await Promise.all([
     listParties(),
     listItems(),
-    supabase.from("aimunim_tenants").select("state_code").eq("id", tenantId).single(),
+    supabase
+      .from("aimunim_tenants")
+      .select("state_code, invoice_settings")
+      .eq("id", tenantId)
+      .single(),
   ]);
+  const defaultTheme =
+    ((tenant?.invoice_settings as { default_theme?: string } | null)?.default_theme as
+      | string
+      | undefined) ?? "classic";
 
   return (
     <div>
@@ -40,6 +48,7 @@ export default async function NewInvoicePage({
         businessStateCode={tenant?.state_code ?? ""}
         suggestedNumber=""
         initialVoucherType={voucherType}
+        initialTheme={defaultTheme}
         parties={parties.map((p) => ({
           id: p.id,
           name: p.name,

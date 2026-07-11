@@ -18,7 +18,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export function ItemsTable({ items }: { items: ItemRow[] }) {
+export function ItemsTable({
+  items,
+  extraUnits = [],
+}: {
+  items: ItemRow[];
+  extraUnits?: string[];
+}) {
   if (items.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
@@ -80,6 +86,7 @@ export function ItemsTable({ items }: { items: ItemRow[] }) {
                     </Button>
                     <ItemFormDialog
                       item={item}
+                      extraUnits={extraUnits}
                       trigger={
                         <Button variant="ghost" size="icon">
                           <Pencil className="size-4" />

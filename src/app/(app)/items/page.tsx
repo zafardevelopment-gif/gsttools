@@ -4,6 +4,8 @@ import { ItemsTable } from "./items-table";
 import { ImportDialog } from "@/components/import-dialog";
 import { importItemsAction } from "@/server/actions/import";
 import { listItems } from "@/server/queries/items";
+import { createClient } from "@/lib/supabase/server";
+import { requireActiveContext } from "@/lib/tenant";
 
 export const metadata = { title: "Items · GST Billing" };
 
@@ -14,7 +16,13 @@ const ITEMS_TEMPLATE = [
 ].join("\n");
 
 export default async function ItemsPage() {
-  const items = await listItems();
+  const { tenantId } = await requireActiveContext();
+  const supabase = await createClient();
+  const [items, { data: tenant }] = await Promise.all([
+    listItems(),
+    supabase.from("aimunim_tenants").select("custom_units").eq("id", tenantId).single(),
+  ]);
+  const extraUnits = tenant?.custom_units ?? [];
   return (
     <div>
       <PageHeader
@@ -28,11 +36,11 @@ export default async function ItemsPage() {
               templateFilename="items-template.csv"
               action={importItemsAction}
             />
-            <ItemFormDialog />
+            <ItemFormDialog extraUnits={extraUnits} />
           </div>
         }
       />
-      <ItemsTable items={items} />
+      <ItemsTable items={items} extraUnits={extraUnits} />
     </div>
   );
 }

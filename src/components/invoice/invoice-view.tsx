@@ -2,14 +2,33 @@ import { formatINR } from "@/lib/money";
 import { STATE_CODE_TO_NAME, INVOICE_THEMES, type InvoiceThemeKey } from "@/lib/constants";
 import type { FullInvoice } from "@/server/queries/invoices";
 
+export type ViewExtras = {
+  settings?: {
+    show_party_balance?: boolean;
+    show_phone?: boolean;
+    show_time?: boolean;
+    receiver_signature?: boolean;
+  };
+  logoUrl?: string | null;
+  signatureUrl?: string | null;
+  qrDataUrl?: string | null;
+};
+
 /**
  * Presentational, print-friendly invoice. Pure (no client hooks) so it renders
  * on the server and inside the print route. Uses the invoice's selected theme
  * accent so the on-screen view matches the PDF. Tailwind `print:` utilities
  * keep it clean on paper.
  */
-export function InvoiceView({ data }: { data: FullInvoice }) {
+export function InvoiceView({
+  data,
+  extras = {},
+}: {
+  data: FullInvoice;
+  extras?: ViewExtras;
+}) {
   const { invoice, items, party, tenant } = data;
+  const opts = extras.settings ?? {};
   const isGst = invoice.invoice_type === "gst";
   const interstate = invoice.is_interstate;
   const balanceDue = invoice.total_paise - invoice.amount_paid_paise;
@@ -27,21 +46,31 @@ export function InvoiceView({ data }: { data: FullInvoice }) {
         className="flex items-start justify-between border-b-2 pb-5"
         style={{ borderColor: theme.accent }}
       >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: theme.accent }}>
-            {tenant.name}
-          </h1>
-          <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-zinc-600">
-            {tenant.address_line1 && <p>{tenant.address_line1}</p>}
-            {(tenant.city || tenant.state || tenant.pincode) && (
-              <p>
-                {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
-              </p>
-            )}
-            {tenant.gstin && (
-              <p className="font-medium text-zinc-800">GSTIN: {tenant.gstin}</p>
-            )}
-            {tenant.phone && <p>Ph: {tenant.phone}</p>}
+        <div className="flex items-start gap-3">
+          {extras.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={extras.logoUrl}
+              alt="Logo"
+              className="size-14 rounded-md object-contain"
+            />
+          )}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: theme.accent }}>
+              {tenant.name}
+            </h1>
+            <div className="mt-1 space-y-0.5 text-xs leading-relaxed text-zinc-600">
+              {tenant.address_line1 && <p>{tenant.address_line1}</p>}
+              {(tenant.city || tenant.state || tenant.pincode) && (
+                <p>
+                  {[tenant.city, tenant.state, tenant.pincode].filter(Boolean).join(", ")}
+                </p>
+              )}
+              {tenant.gstin && (
+                <p className="font-medium text-zinc-800">GSTIN: {tenant.gstin}</p>
+              )}
+              {tenant.phone && opts.show_phone !== false && <p>Ph: {tenant.phone}</p>}
+            </div>
           </div>
         </div>
         <div className="text-right">
@@ -53,7 +82,10 @@ export function InvoiceView({ data }: { data: FullInvoice }) {
           </span>
           <p className="mt-2 text-base font-bold tabular-nums">{invoice.invoice_number}</p>
           <div className="mt-1 space-y-0.5 text-xs text-zinc-600">
-            <p>Date: {invoice.invoice_date}</p>
+            <p>
+              Date: {invoice.invoice_date}
+              {opts.show_time ? ` ${invoice.created_at.slice(11, 16)}` : ""}
+            </p>
             {invoice.due_date && <p>Due: {invoice.due_date}</p>}
             {invoice.eway_bill_no && <p>e-Way Bill: {invoice.eway_bill_no}</p>}
           </div>
@@ -171,8 +203,52 @@ export function InvoiceView({ data }: { data: FullInvoice }) {
               </div>
             </>
           )}
+          {opts.show_party_balance && party && (
+            <Row
+              label="Party total outstanding"
+              value={formatINR(Math.max(0, party.balance_paise))}
+            />
+          )}
         </div>
       </div>
+
+      {/* Payment QR + signatures */}
+      {(extras.qrDataUrl || extras.signatureUrl || opts.receiver_signature) && (
+        <div className="mt-8 flex items-end justify-between gap-4">
+          {extras.qrDataUrl ? (
+            <div className="text-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={extras.qrDataUrl} alt="UPI QR" className="size-24" />
+              <p className="mt-1 text-[10px] text-zinc-500">Scan to pay (UPI)</p>
+            </div>
+          ) : (
+            <div />
+          )}
+          <div className="flex gap-10">
+            {opts.receiver_signature && (
+              <div className="w-36 text-center">
+                <div className="h-10" />
+                <div className="border-t border-zinc-300" />
+                <p className="mt-1 text-[10px] text-zinc-500">Receiver&apos;s signature</p>
+              </div>
+            )}
+            {extras.signatureUrl && (
+              <div className="w-36 text-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={extras.signatureUrl}
+                  alt="Signature"
+                  className="mx-auto h-10 object-contain"
+                />
+                <div className="border-t border-zinc-300" />
+                <p className="mt-1 text-[10px] text-zinc-500">
+                  Authorised signatory — {tenant.name}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {(invoice.notes || invoice.terms || invoice.irn) && (
         <div className="mt-8 space-y-1.5 border-t pt-4 text-xs text-zinc-500">
