@@ -49,6 +49,8 @@ export const invoiceInputSchema = z.object({
   terms: z.string().trim().optional(),
   template: z.string().default("classic"),
   status: z.enum(["draft", "final"]).default("final"),
+  /** Skip stock posting (e.g. challan→invoice convert: stock already moved). */
+  skipStock: z.boolean().optional().default(false),
   lines: z.array(invoiceLineSchema).min(1, "Add at least one line item."),
 });
 

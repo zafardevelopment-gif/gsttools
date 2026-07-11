@@ -3,15 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_GROUPS } from "./nav-items";
+import { canAccessRoute } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+export function Sidebar({ role = "owner" }: { role?: string }) {
   const pathname = usePathname();
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => canAccessRoute(role, i.href)),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-gradient-to-b from-sidebar to-sidebar/70 md:flex md:flex-col print:hidden">
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.title}>
             <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
               {group.title}
@@ -29,8 +34,8 @@ export function Sidebar() {
                     className={cn(
                       "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                       active
-                        ? "bg-white text-primary shadow-sm ring-1 ring-primary/15"
-                        : "text-sidebar-foreground/70 hover:bg-white/60 hover:text-foreground",
+                        ? "bg-card text-primary shadow-sm ring-1 ring-primary/15"
+                        : "text-sidebar-foreground/70 hover:bg-card/60 hover:text-foreground",
                     )}
                   >
                     {active && (

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { sendNotification } from "@/server/notifications";
+import { requireFeature } from "@/server/gating";
 
 export type ActionResult = { ok?: true; error?: string; sent?: number };
 
@@ -44,6 +45,9 @@ export async function createCampaignAction(
  * auditable path — the same builder works for WhatsApp today and SMS later).
  */
 export async function sendCampaignAction(campaignId: string): Promise<ActionResult> {
+  const gate = await requireFeature("marketing");
+  if (!gate.ok) return { error: gate.error };
+
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
 

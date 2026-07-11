@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { SettingsForm } from "./settings-form";
@@ -13,6 +14,7 @@ export const metadata = { title: "Settings · GST Billing" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  await requireRouteAccess("/settings");
   const ctx = await getAppContext();
   const tenant = ctx.activeTenant;
   const printSettings = (tenant?.print_settings ?? {}) as { paper?: string };

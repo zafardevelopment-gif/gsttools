@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
@@ -7,6 +8,7 @@ export const metadata = { title: "WhatsApp Marketing · GST Billing" };
 export const dynamic = "force-dynamic";
 
 export default async function MarketingPage() {
+  await requireRouteAccess("/marketing");
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
   const { data: campaigns } = await supabase

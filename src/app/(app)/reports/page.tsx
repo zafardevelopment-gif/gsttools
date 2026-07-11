@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { ReportToolbar } from "./report-toolbar";
 import { ReportView } from "./report-view";
@@ -27,6 +28,7 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<{ type?: string; from?: string; to?: string }>;
 }) {
+  await requireRouteAccess("/reports");
   const sp = await searchParams;
   const month = currentMonthRange();
   const type = sp.type ?? "sales";

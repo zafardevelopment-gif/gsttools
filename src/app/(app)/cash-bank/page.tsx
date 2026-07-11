@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ export const metadata = { title: "Cash & Bank · GST Billing" };
 export const dynamic = "force-dynamic";
 
 export default async function CashBankPage() {
+  await requireRouteAccess("/cash-bank");
   const summary = await getCashBankSummary();
   const accountOptions = summary.accounts.map((a) => ({ id: a.id, name: a.name }));
 

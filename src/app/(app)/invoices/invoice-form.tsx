@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
-import { createInvoiceAction } from "@/server/actions/invoices";
+import { createInvoiceAction, updateInvoiceAction } from "@/server/actions/invoices";
 import { computeInvoiceTotals, isInterstateSupply } from "@/lib/gst";
 import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/money";
 import {
@@ -83,6 +83,8 @@ export function InvoiceForm({
   suggestedNumber,
   initialVoucherType = "invoice",
   initialTheme = "classic",
+  editId,
+  initial,
 }: {
   parties: PartyOption[];
   items: ItemOption[];
@@ -90,6 +92,30 @@ export function InvoiceForm({
   suggestedNumber: string;
   initialVoucherType?: VoucherTypeKey;
   initialTheme?: string;
+  /** When set, the form edits this voucher instead of creating a new one. */
+  editId?: string;
+  initial?: {
+    direction: "sale" | "purchase";
+    invoiceType: "gst" | "non_gst";
+    partyId: string | null;
+    invoiceNumber: string;
+    invoiceDate: string;
+    dueDate: string | null;
+    additionalCharges: number; // rupees
+    roundOff: boolean;
+    notes: string;
+    terms: string;
+    lines: {
+      itemId: string | null;
+      name: string;
+      hsn_sac: string;
+      unit: string;
+      qty: number;
+      rate: number; // rupees
+      taxRate: number;
+      discountPercent: number;
+    }[];
+  };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -97,25 +123,45 @@ export function InvoiceForm({
   const [voucherType, setVoucherType] =
     useState<VoucherTypeKey>(initialVoucherType);
   const [direction, setDirection] = useState<"sale" | "purchase">(
-    VOUCHER_TYPES[initialVoucherType].direction,
+    initial?.direction ?? VOUCHER_TYPES[initialVoucherType].direction,
   );
-  const [invoiceType, setInvoiceType] = useState<"gst" | "non_gst">("gst");
-  const [partyId, setPartyId] = useState<string>("");
-  const [invoiceNumber, setInvoiceNumber] = useState(suggestedNumber);
+  const [invoiceType, setInvoiceType] = useState<"gst" | "non_gst">(
+    initial?.invoiceType ?? "gst",
+  );
+  const [partyId, setPartyId] = useState<string>(initial?.partyId ?? "");
+  const [invoiceNumber, setInvoiceNumber] = useState(
+    initial?.invoiceNumber ?? suggestedNumber,
+  );
   const [invoiceDate, setInvoiceDate] = useState(
-    new Date().toISOString().slice(0, 10),
+    initial?.invoiceDate ?? new Date().toISOString().slice(0, 10),
   );
-  const [dueDate, setDueDate] = useState("");
-  const [additionalCharges, setAdditionalCharges] = useState("0");
-  const [roundOff, setRoundOff] = useState(true);
-  const [notes, setNotes] = useState("");
-  const [terms, setTerms] = useState("");
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
+  const [additionalCharges, setAdditionalCharges] = useState(
+    initial ? String(initial.additionalCharges) : "0",
+  );
+  const [roundOff, setRoundOff] = useState(initial?.roundOff ?? true);
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [terms, setTerms] = useState(initial?.terms ?? "");
   const [template, setTemplate] = useState<InvoiceThemeKey>(
     (initialTheme as InvoiceThemeKey) in INVOICE_THEMES
       ? (initialTheme as InvoiceThemeKey)
       : "classic",
   );
-  const [lines, setLines] = useState<Line[]>([emptyLine()]);
+  const [lines, setLines] = useState<Line[]>(
+    initial?.lines.length
+      ? initial.lines.map((l) => ({
+          key: lineSeq++,
+          itemId: l.itemId,
+          name: l.name,
+          hsn_sac: l.hsn_sac,
+          unit: l.unit,
+          qty: String(l.qty),
+          rate: String(l.rate),
+          taxRate: String(l.taxRate),
+          discountPercent: String(l.discountPercent),
+        }))
+      : [emptyLine()],
+  );
 
   const party = parties.find((p) => p.id === partyId);
   const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;
@@ -169,7 +215,7 @@ export function InvoiceForm({
       return;
     }
     startTransition(async () => {
-      const res = await createInvoiceAction({
+      const payload = {
         direction,
         voucherType,
         invoiceType,
@@ -195,10 +241,13 @@ export function InvoiceForm({
             taxRate: Number(l.taxRate) || 0,
             discountPercent: Number(l.discountPercent) || 0,
           })),
-      });
+      };
+      const res = editId
+        ? await updateInvoiceAction(editId, payload)
+        : await createInvoiceAction(payload);
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Invoice saved.");
+        toast.success(editId ? "Invoice updated." : "Invoice saved.");
         router.push(`/invoices/${res.id}`);
       }
     });
@@ -219,6 +268,7 @@ export function InvoiceForm({
             <Label>Voucher</Label>
             <Select
               value={`${direction}:${voucherType}`}
+              disabled={!!editId}
               onValueChange={(v) => {
                 const [dir, vt] = v.split(":") as [
                   "sale" | "purchase",

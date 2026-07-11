@@ -14,6 +14,8 @@ import { getDashboardStats } from "@/server/queries/reports";
 import { getAppContext } from "@/server/queries/app-context";
 import { createClient } from "@/lib/supabase/server";
 import { SetupGuide, type SetupStep } from "@/components/setup-guide";
+import { getDashboardCharts } from "@/server/queries/charts";
+import { DashboardCharts } from "./dashboard-charts";
 import { formatINR } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +64,11 @@ function Stat({
 }
 
 export default async function DashboardPage() {
-  const [stats, ctx] = await Promise.all([getDashboardStats(), getAppContext()]);
+  const [stats, ctx, charts] = await Promise.all([
+    getDashboardStats(),
+    getAppContext(),
+    getDashboardCharts(),
+  ]);
   const tenant = ctx.activeTenant;
 
   // First-run setup checklist (hidden once everything is done).
@@ -155,6 +161,11 @@ export default async function DashboardPage() {
           accent={stats.lowStock.length ? "var(--color-destructive)" : "var(--color-chart-3)"}
         />
       </div>
+
+      <DashboardCharts
+        salesTrend={charts.salesTrend}
+        paymentModes={charts.paymentModes}
+      />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>

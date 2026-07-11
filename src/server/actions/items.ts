@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { itemFormSchema, type ItemFormValues } from "@/lib/validation/item";
 import { rupeesToPaise } from "@/lib/money";
@@ -29,6 +29,30 @@ function parseItem(formData: FormData) {
     alt_unit: formData.get("alt_unit") ?? undefined,
     alt_unit_factor: formData.get("alt_unit_factor") ?? 0,
   });
+}
+
+/** Upload an item photo (logos bucket) and return its path, or null. */
+async function uploadItemImage(
+  tenantId: string,
+  itemId: string,
+  file: File | null,
+): Promise<string | null> {
+  if (!file || file.size === 0) return null;
+  if (file.size > 3 * 1024 * 1024) throw new Error("Image max 3 MB honi chahiye.");
+  if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+    throw new Error("PNG/JPG/WEBP image hi chalegi.");
+  }
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${tenantId}/items/${itemId}.${ext}`;
+  const admin = createAdminClient();
+  const { error } = await admin.storage
+    .from("logos")
+    .upload(path, Buffer.from(await file.arrayBuffer()), {
+      contentType: file.type,
+      upsert: true,
+    });
+  if (error) throw new Error(error.message);
+  return path;
 }
 
 /** Shared column payload for the new (0007) item fields. */
@@ -73,6 +97,20 @@ export async function createItemAction(formData: FormData): Promise<ActionResult
     .single();
 
   if (error || !item) return { error: error?.message ?? "Could not create item." };
+
+  // Optional photo (shown on the storefront and item list).
+  try {
+    const imagePath = await uploadItemImage(
+      tenantId,
+      item.id,
+      formData.get("image") as File | null,
+    );
+    if (imagePath) {
+      await supabase.from("aimunim_items").update({ image_path: imagePath }).eq("id", item.id);
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Image upload failed." };
+  }
 
   // Opening stock → ledger movement (trigger updates items.stock_qty).
   if (v.type === "product" && v.opening_stock > 0) {
@@ -121,6 +159,20 @@ export async function updateItemAction(
     .eq("tenant_id", tenantId);
 
   if (error) return { error: error.message };
+
+  try {
+    const imagePath = await uploadItemImage(
+      tenantId,
+      id,
+      formData.get("image") as File | null,
+    );
+    if (imagePath) {
+      await supabase.from("aimunim_items").update({ image_path: imagePath }).eq("id", id);
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Image upload failed." };
+  }
+
   revalidatePath("/items");
   return { ok: true };
 }

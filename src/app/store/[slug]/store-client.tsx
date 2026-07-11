@@ -24,6 +24,7 @@ export type StoreItem = {
   category: string | null;
   sale_price_paise: number;
   description: string | null;
+  imageUrl?: string | null;
 };
 
 export function StoreClient({ slug, items }: { slug: string; items: StoreItem[] }) {
@@ -115,6 +116,15 @@ export function StoreClient({ slug, items }: { slug: string; items: StoreItem[] 
             return (
               <Card key={i.id}>
                 <CardContent className="flex flex-col gap-2 p-3">
+                  {i.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={i.imageUrl}
+                      alt={i.name}
+                      className="h-28 w-full rounded-md bg-muted object-cover"
+                      loading="lazy"
+                    />
+                  )}
                   <div>
                     <p className="font-medium leading-tight">{i.name}</p>
                     {i.description && (

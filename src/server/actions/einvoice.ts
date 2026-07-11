@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { logAudit } from "@/server/audit";
+import { requireFeature } from "@/server/gating";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -14,6 +15,9 @@ export type ActionResult = { ok?: true; error?: string };
  * Swap this action's internals with a GSP API call later; UI/schema unchanged.
  */
 export async function generateEInvoiceAction(invoiceId: string): Promise<ActionResult> {
+  const gate = await requireFeature("einvoice");
+  if (!gate.ok) return { error: gate.error };
+
   const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
 

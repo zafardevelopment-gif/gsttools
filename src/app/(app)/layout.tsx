@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { TenantSwitcher } from "@/components/layout/tenant-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getAppContext } from "@/server/queries/app-context";
 
 export default async function AppLayout({
@@ -28,10 +29,13 @@ export default async function AppLayout({
           </Link>
           <TenantSwitcher tenants={ctx.tenants} activeTenantId={ctx.tenantId} />
         </div>
-        <UserMenu label={ctx.userLabel} />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <UserMenu label={ctx.userLabel} />
+        </div>
       </header>
       <div className="flex flex-1">
-        <Sidebar />
+        <Sidebar role={ctx.role} />
         <main className="flex-1 overflow-x-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

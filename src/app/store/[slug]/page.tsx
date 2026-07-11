@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Store } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/server";
+import { publicEnv } from "@/lib/env";
 import { StoreClient } from "./store-client";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +27,17 @@ export default async function StorePage({
 
   const { data: items } = await admin
     .from("aimunim_items")
-    .select("id, name, unit, category, sale_price_paise, description")
+    .select("id, name, unit, category, sale_price_paise, description, image_path")
     .eq("tenant_id", tenant.id)
     .eq("is_active", true)
     .order("name");
+
+  const withImages = (items ?? []).map((i) => ({
+    ...i,
+    imageUrl: i.image_path
+      ? `${publicEnv.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/logos/${i.image_path}`
+      : null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -45,7 +53,7 @@ export default async function StorePage({
           </p>
         </div>
       </header>
-      <StoreClient slug={slug} items={items ?? []} />
+      <StoreClient slug={slug} items={withImages} />
     </main>
   );
 }

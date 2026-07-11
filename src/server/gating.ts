@@ -1,8 +1,37 @@
 import "server-only";
 import { getSubscription, getMonthlyInvoiceCount, planKeyOf } from "@/server/queries/subscription";
 import { isSubscriptionActive, monthlyInvoiceLimit } from "@/lib/subscription";
+import type { PlanKey } from "@/lib/constants";
 
 export type GateResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Premium feature → plans that include it (trial gets everything so users can
+ * evaluate). Enforced server-side in the relevant actions — never UI-only.
+ */
+const FEATURE_PLANS: Record<string, PlanKey[]> = {
+  einvoice: ["trial", "gold", "diamond", "platinum", "enterprise"],
+  marketing: ["trial", "diamond", "platinum", "enterprise"],
+  staff: ["trial", "gold", "diamond", "platinum", "enterprise"],
+  recurring: ["trial", "silver", "gold", "diamond", "platinum", "enterprise"],
+};
+
+/** Plan-based feature gate. Also fails when the subscription has lapsed. */
+export async function requireFeature(feature: keyof typeof FEATURE_PLANS): Promise<GateResult> {
+  const sub = await getSubscription();
+  if (!sub) return { ok: true }; // pre-provision — allow
+  if (!isSubscriptionActive(sub)) {
+    return { ok: false, error: "Subscription expired — plan upgrade karein." };
+  }
+  const plan = planKeyOf(sub);
+  if (!FEATURE_PLANS[feature]?.includes(plan)) {
+    return {
+      ok: false,
+      error: `Ye feature aapke ${plan} plan me nahi hai — upgrade karein.`,
+    };
+  }
+  return { ok: true };
+}
 
 /**
  * Plan-based gating for creating a (non-draft) sale invoice:

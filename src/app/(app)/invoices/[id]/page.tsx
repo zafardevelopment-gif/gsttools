@@ -7,6 +7,8 @@ import { getInvoiceRenderExtras } from "@/server/invoice-extras";
 import { ShareBar } from "@/components/invoice/share-bar";
 import { ConfirmDelete } from "@/components/confirm-delete";
 import { EInvoicePanel } from "./einvoice-panel";
+import { ConvertButton } from "./convert-button";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
 import { formatINR } from "@/lib/money";
@@ -45,6 +47,14 @@ export default async function InvoiceDetailPage({
             partyPhone={data.party?.phone}
             partyEmail={data.party?.email}
           />
+          {["quotation", "proforma", "delivery_challan"].includes(
+            data.invoice.voucher_type,
+          ) && <ConvertButton sourceId={id} />}
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/invoices/${id}/edit`}>
+              <Pencil className="size-3.5" /> Edit
+            </Link>
+          </Button>
           <Button asChild variant="outline" size="sm">
             <Link href={`/payments/new?invoice=${id}`}>Record payment</Link>
           </Button>

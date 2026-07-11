@@ -3,7 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createPaymentAction } from "@/server/actions/payments";
+import {
+  createPaymentAction,
+  createAllocatedPaymentAction,
+} from "@/server/actions/payments";
 import { PAYMENT_MODES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +22,19 @@ import {
 } from "@/components/ui/select";
 
 export type PartyOption = { id: string; name: string };
+export type UnpaidInvoice = {
+  id: string;
+  number: string;
+  date: string;
+  direction: "sale" | "purchase";
+  partyId: string;
+  dueRupees: number;
+};
 
 export function PaymentForm({
   parties,
   prefill,
+  unpaidInvoices = [],
 }: {
   parties: PartyOption[];
   prefill?: {
@@ -33,6 +45,7 @@ export function PaymentForm({
     amount?: number;
     lockParty?: boolean;
   };
+  unpaidInvoices?: UnpaidInvoice[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -44,19 +57,66 @@ export function PaymentForm({
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Party ke unpaid bills, direction ke hisaab se (in = sale, out = purchase).
+  const partyInvoices = unpaidInvoices.filter(
+    (i) =>
+      i.partyId === partyId &&
+      i.direction === (direction === "in" ? "sale" : "purchase"),
+  );
+  const showAllocation = !prefill?.invoiceId && partyInvoices.length > 0;
+
+  // FIFO allocation of the entered amount across the selected invoices.
+  const allocations: { invoiceId: string; number: string; amount: number }[] = [];
+  {
+    let remaining = Number(amount) || 0;
+    for (const inv of partyInvoices) {
+      if (!selected.has(inv.id) || remaining <= 0) continue;
+      const alloc = Math.min(remaining, inv.dueRupees);
+      allocations.push({ invoiceId: inv.id, number: inv.number, amount: alloc });
+      remaining -= alloc;
+    }
+  }
+  const allocatedTotal = allocations.reduce((s, a) => s + a.amount, 0);
+  const onAccount = Math.max(0, (Number(amount) || 0) - allocatedTotal);
+
+  function toggleInvoice(id: string, on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
   function submit() {
     startTransition(async () => {
-      const res = await createPaymentAction({
-        direction,
-        partyId,
-        invoiceId: prefill?.invoiceId ?? null,
-        amount: Number(amount) || 0,
-        mode,
-        paymentDate,
-        reference,
-        notes,
-      });
+      const res =
+        showAllocation && allocations.length > 0
+          ? await createAllocatedPaymentAction({
+              direction,
+              partyId,
+              amount: Number(amount) || 0,
+              mode,
+              paymentDate,
+              reference,
+              notes,
+              allocations: allocations.map((a) => ({
+                invoiceId: a.invoiceId,
+                amount: a.amount,
+              })),
+            })
+          : await createPaymentAction({
+              direction,
+              partyId,
+              invoiceId: prefill?.invoiceId ?? null,
+              amount: Number(amount) || 0,
+              mode,
+              paymentDate,
+              reference,
+              notes,
+            });
       if (res.error) toast.error(res.error);
       else {
         toast.success("Payment recorded.");
@@ -129,6 +189,50 @@ export function PaymentForm({
               onChange={(e) => setReference(e.target.value)} />
           </div>
         </div>
+
+        {showAllocation && (
+          <div className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-medium">
+              Unpaid invoices — allocate karne ke liye select karein (FIFO)
+            </p>
+            <div className="max-h-44 space-y-1.5 overflow-y-auto">
+              {partyInvoices.map((inv) => {
+                const alloc = allocations.find((a) => a.invoiceId === inv.id);
+                return (
+                  <label
+                    key={inv.id}
+                    className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={selected.has(inv.id)}
+                      onChange={(e) => toggleInvoice(inv.id, e.target.checked)}
+                    />
+                    <span className="font-medium">{inv.number}</span>
+                    <span className="text-xs text-muted-foreground">{inv.date}</span>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                      Due ₹{inv.dueRupees.toLocaleString("en-IN")}
+                    </span>
+                    {alloc && (
+                      <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                        → ₹{alloc.amount.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+            {selected.size > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Allocated: ₹{allocatedTotal.toLocaleString("en-IN")}
+                {onAccount > 0
+                  ? ` · Baaki ₹${onAccount.toLocaleString("en-IN")} on-account jayega`
+                  : ""}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="notes">Notes</Label>

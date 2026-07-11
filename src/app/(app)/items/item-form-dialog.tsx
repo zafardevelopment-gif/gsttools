@@ -246,6 +246,13 @@ export function ItemFormDialog({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="item_image">
+              Photo {item?.image_path ? "(replace)" : ""} — storefront par dikhegi
+            </Label>
+            <Input id="item_image" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
+          </div>
+
           {type === "product" && (
             <div className="grid grid-cols-2 gap-3">
               {!isEdit && (

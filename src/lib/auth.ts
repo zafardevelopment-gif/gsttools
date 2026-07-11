@@ -9,6 +9,7 @@
  */
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { canAccessRoute } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveContext } from "@/lib/tenant";
 import { authDisabled, DEMO_TENANT_ID } from "@/lib/env";
@@ -89,4 +90,16 @@ export async function requireTenant() {
   const ctx = await getActiveContext();
   if (!ctx) redirect("/onboarding");
   return { user, ...ctx };
+}
+
+/**
+ * Page guard: user logged-in + tenant active + role allowed for this route.
+ * Denied roles bounce to /dashboard (or /invoices for delivery boys).
+ */
+export async function requireRouteAccess(routePrefix: string) {
+  const ctx = await requireTenant();
+  if (!canAccessRoute(ctx.role, routePrefix)) {
+    redirect(canAccessRoute(ctx.role, "/dashboard") ? "/dashboard" : "/invoices");
+  }
+  return ctx;
 }

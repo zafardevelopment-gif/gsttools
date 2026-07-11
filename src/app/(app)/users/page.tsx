@@ -1,3 +1,4 @@
+import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { listMembers, listActivity } from "@/server/queries/users";
@@ -7,6 +8,7 @@ export const metadata = { title: "Manage Users · GST Billing" };
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {
+  await requireRouteAccess("/users");
   const [members, activity] = await Promise.all([listMembers(), listActivity(50)]);
 
   return (
