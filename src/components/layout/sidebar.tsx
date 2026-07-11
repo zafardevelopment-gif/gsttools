@@ -9,7 +9,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r bg-sidebar md:flex md:flex-col print:hidden">
+    <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-gradient-to-b from-sidebar to-sidebar/70 md:flex md:flex-col print:hidden">
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-5">
         {NAV_GROUPS.map((group) => (
           <div key={group.title}>
@@ -27,10 +27,10 @@ export function Sidebar() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                       active
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-white text-primary shadow-sm ring-1 ring-primary/15"
+                        : "text-sidebar-foreground/70 hover:bg-white/60 hover:text-foreground",
                     )}
                   >
                     {active && (

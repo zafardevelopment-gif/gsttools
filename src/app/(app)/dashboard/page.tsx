@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { getDashboardStats } from "@/server/queries/reports";
 import { getAppContext } from "@/server/queries/app-context";
+import { createClient } from "@/lib/supabase/server";
+import { SetupGuide, type SetupStep } from "@/components/setup-guide";
 import { formatINR } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -61,11 +63,72 @@ function Stat({
 
 export default async function DashboardPage() {
   const [stats, ctx] = await Promise.all([getDashboardStats(), getAppContext()]);
+  const tenant = ctx.activeTenant;
+
+  // First-run setup checklist (hidden once everything is done).
+  const supabase = await createClient();
+  const countOf = async (table: "aimunim_items" | "aimunim_parties" | "aimunim_invoices") => {
+    const { count } = await supabase
+      .from(table)
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", ctx.tenantId);
+    return count ?? 0;
+  };
+  const [itemCount, partyCount, invoiceCount] = await Promise.all([
+    countOf("aimunim_items"),
+    countOf("aimunim_parties"),
+    countOf("aimunim_invoices"),
+  ]);
+
+  const setupSteps: SetupStep[] = [
+    {
+      key: "profile",
+      label: "Business profile poora karein",
+      hint: "Address, phone aur GSTIN",
+      href: "/settings",
+      done: !!(tenant.address_line1 && tenant.phone),
+    },
+    {
+      key: "logo",
+      label: "Logo upload karein",
+      hint: "Invoices par professional dikhega",
+      href: "/settings",
+      done: !!tenant.logo_path,
+    },
+    {
+      key: "upi",
+      label: "UPI ID set karein",
+      hint: "Bills par payment QR aayega",
+      href: "/settings",
+      done: !!tenant.upi_id,
+    },
+    {
+      key: "item",
+      label: "Pehla item add karein",
+      hint: "Product ya service, price ke saath",
+      href: "/items",
+      done: itemCount > 0,
+    },
+    {
+      key: "party",
+      label: "Pehla customer add karein",
+      hint: "Ya Excel se bulk import karein",
+      href: "/parties",
+      done: partyCount > 0,
+    },
+    {
+      key: "invoice",
+      label: "Pehla invoice banayein",
+      hint: "GST auto-calculate hota hai",
+      href: "/invoices/new",
+      done: invoiceCount > 0,
+    },
+  ];
 
   return (
     <div>
       <PageHeader
-        title={`Welcome, ${ctx.activeTenant.name}`}
+        title={`Welcome, ${tenant.name}`}
         description="Your business at a glance (this month)."
         action={
           <Button asChild>
@@ -73,6 +136,8 @@ export default async function DashboardPage() {
           </Button>
         }
       />
+
+      <SetupGuide steps={setupSteps} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Today's sales" value={formatINR(stats.todaySalesPaise)} icon={TrendingUp} accent="var(--color-chart-1)" />
