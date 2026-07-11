@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { listMembers, listActivity } from "@/server/queries/users";
 import { InviteUserDialog, MembersTable } from "./users-client";
 
-export const metadata = { title: "Manage Users · GST Billing" };
+export const metadata = { title: "Manage Users · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function UsersPage() {

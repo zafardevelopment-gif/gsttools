@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const metadata = { title: "Super Admin · GST Billing" };
+export const metadata = { title: "Super Admin · AI Munim" };
 export const dynamic = "force-dynamic";
 
 /**

@@ -5,7 +5,7 @@ import { listExpenses } from "@/server/queries/expenses";
 import { formatINR } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 
-export const metadata = { title: "Expenses · GST Billing" };
+export const metadata = { title: "Expenses · AI Munim" };
 
 export default async function ExpensesPage() {
   const expenses = await listExpenses();

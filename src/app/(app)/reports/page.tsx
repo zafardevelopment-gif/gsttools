@@ -21,7 +21,7 @@ import {
   balanceSheetReport,
 } from "@/server/queries/reports-extra";
 
-export const metadata = { title: "Reports · GST Billing" };
+export const metadata = { title: "Reports · AI Munim" };
 
 export default async function ReportsPage({
   searchParams,

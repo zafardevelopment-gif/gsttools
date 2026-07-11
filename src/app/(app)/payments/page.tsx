@@ -15,7 +15,7 @@ import {
 import { listPayments } from "@/server/queries/payments";
 import { formatINR } from "@/lib/money";
 
-export const metadata = { title: "Payments · GST Billing" };
+export const metadata = { title: "Payments · AI Munim" };
 
 export default async function PaymentsPage() {
   const payments = await listPayments();

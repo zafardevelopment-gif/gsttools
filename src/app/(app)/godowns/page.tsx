@@ -16,7 +16,7 @@ import {
   AssignStockDialog,
 } from "./godowns-client";
 
-export const metadata = { title: "Godowns · GST Billing" };
+export const metadata = { title: "Godowns · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function GodownsPage() {

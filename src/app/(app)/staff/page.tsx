@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/page-header";
 import { listStaff } from "@/server/queries/staff";
 import { AddStaffDialog, StaffList } from "./staff-client";
 
-export const metadata = { title: "Staff & Payroll · GST Billing" };
+export const metadata = { title: "Staff & Payroll · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function StaffPage() {

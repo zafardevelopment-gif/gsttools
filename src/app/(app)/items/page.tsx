@@ -7,7 +7,7 @@ import { listItems } from "@/server/queries/items";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 
-export const metadata = { title: "Items · GST Billing" };
+export const metadata = { title: "Items · AI Munim" };
 
 const ITEMS_TEMPLATE = [
   "name,type,sku,hsn,unit,category,sale_price,purchase_price,mrp,tax_rate,opening_stock,low_stock_level,barcode,description",

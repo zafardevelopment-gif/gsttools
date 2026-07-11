@@ -60,7 +60,7 @@ export function Sidebar({ role = "owner" }: { role?: string }) {
 
       <div className="border-t px-4 py-3">
         <p className="text-[11px] text-muted-foreground">
-          GST Billing
+          AI Munim
           <span className="mx-1.5 text-muted-foreground/40">·</span>
           v0.1
         </p>

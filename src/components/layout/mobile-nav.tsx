@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, FileText } from "lucide-react";
+import { Menu } from "lucide-react";
 import { NAV_GROUPS } from "./nav-items";
 import {
   Sheet,
@@ -33,10 +33,11 @@ export function MobileNav() {
       <SheetContent side="left" className="w-64 bg-sidebar">
         <SheetTitle asChild>
           <div className="flex items-center gap-2 font-bold tracking-tight">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <FileText className="size-4" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ai-munim.svg" alt="AI Munim" className="size-7 rounded-lg" />
+            <span>
+              AI <span className="text-emerald-600 dark:text-emerald-400">Munim</span>
             </span>
-            GST Billing
           </div>
         </SheetTitle>
 

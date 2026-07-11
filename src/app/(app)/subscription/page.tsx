@@ -8,7 +8,7 @@ import { formatINR } from "@/lib/money";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-export const metadata = { title: "Subscription · GST Billing" };
+export const metadata = { title: "Subscription · AI Munim" };
 
 const ORDER: PlanKey[] = ["trial", "silver", "gold", "diamond"];
 

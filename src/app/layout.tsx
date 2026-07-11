@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GST Billing — Invoicing for Indian businesses",
+  title: "AI Munim — Invoicing for Indian businesses",
   description:
     "Simple GST billing, inventory, parties, payments and reports for Indian small businesses.",
 };

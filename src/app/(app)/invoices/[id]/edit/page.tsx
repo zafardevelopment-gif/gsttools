@@ -7,7 +7,7 @@ import { listItems } from "@/server/queries/items";
 import { paiseToRupees } from "@/lib/money";
 import { VOUCHER_TYPES, type VoucherTypeKey } from "@/lib/constants";
 
-export const metadata = { title: "Edit invoice · GST Billing" };
+export const metadata = { title: "Edit invoice · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function EditInvoicePage({

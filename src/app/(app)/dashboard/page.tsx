@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 
-export const metadata = { title: "Dashboard · GST Billing" };
+export const metadata = { title: "Dashboard · AI Munim" };
 
 function Stat({
   label,

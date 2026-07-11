@@ -16,7 +16,7 @@ import { VOUCHER_TYPES, type VoucherTypeKey } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 
-export const metadata = { title: "Invoices · GST Billing" };
+export const metadata = { title: "Invoices · AI Munim" };
 
 const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
   paid: "default",

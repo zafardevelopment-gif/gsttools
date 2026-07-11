@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { NewRecurringDialog, RecurringList } from "./recurring-client";
 
-export const metadata = { title: "Automated Bills · GST Billing" };
+export const metadata = { title: "Automated Bills · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function RecurringPage() {

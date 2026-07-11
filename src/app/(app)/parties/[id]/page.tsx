@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const metadata = { title: "Party ledger · GST Billing" };
+export const metadata = { title: "Party ledger · AI Munim" };
 
 function balanceText(paise: number) {
   if (paise === 0) return "Settled";

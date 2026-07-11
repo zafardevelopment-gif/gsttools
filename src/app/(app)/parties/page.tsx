@@ -5,7 +5,7 @@ import { ImportDialog } from "@/components/import-dialog";
 import { importPartiesAction } from "@/server/actions/import";
 import { listParties } from "@/server/queries/parties";
 
-export const metadata = { title: "Parties · GST Billing" };
+export const metadata = { title: "Parties · AI Munim" };
 
 const PARTIES_TEMPLATE = [
   "name,type,gstin,state_code,phone,email,billing_address,opening_balance,pan,category,credit_period_days,credit_limit",

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { TenantSwitcher } from "@/components/layout/tenant-switcher";
@@ -20,11 +19,14 @@ export default async function AppLayout({
         <div className="flex items-center gap-2 sm:gap-3">
           <MobileNav />
           <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm">
-              <FileText className="size-4" />
-            </span>
-            <span className="hidden bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text sm:inline">
-              GST Billing
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/ai-munim.svg"
+              alt="AI Munim"
+              className="size-8 rounded-xl shadow-sm"
+            />
+            <span className="hidden sm:inline">
+              AI <span className="text-emerald-600 dark:text-emerald-400">Munim</span>
             </span>
           </Link>
           <TenantSwitcher tenants={ctx.tenants} activeTenantId={ctx.tenantId} />

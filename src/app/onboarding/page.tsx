@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { getActiveContext } from "@/lib/tenant";
 import { OnboardingForm } from "./onboarding-form";
 
-export const metadata = { title: "Set up your business · GST Billing" };
+export const metadata = { title: "Set up your business · AI Munim" };
 
 export default async function OnboardingPage() {
   await requireUser();

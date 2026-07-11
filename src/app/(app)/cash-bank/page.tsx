@@ -18,7 +18,7 @@ import {
   TransferMoneyDialog,
 } from "./cashbank-dialogs";
 
-export const metadata = { title: "Cash & Bank · GST Billing" };
+export const metadata = { title: "Cash & Bank · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function CashBankPage() {

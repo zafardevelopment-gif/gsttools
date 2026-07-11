@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { NewCampaignDialog, CampaignList } from "./marketing-client";
 
-export const metadata = { title: "WhatsApp Marketing · GST Billing" };
+export const metadata = { title: "WhatsApp Marketing · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function MarketingPage() {

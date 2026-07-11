@@ -6,7 +6,7 @@ import { paiseToRupees } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 
-export const metadata = { title: "Record payment · GST Billing" };
+export const metadata = { title: "Record payment · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function NewPaymentPage({

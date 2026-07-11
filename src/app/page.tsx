@@ -6,7 +6,7 @@ export default function Home() {
     <main className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-16 text-center">
       <div className="space-y-4 max-w-2xl">
         <span className="inline-block rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-          GST Billing SaaS · MVP
+          AI Munim SaaS · MVP
         </span>
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Billing &amp; GST, made simple for Indian businesses

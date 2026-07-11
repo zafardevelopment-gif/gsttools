@@ -74,14 +74,14 @@
   --chart-4: #db2777;
   --chart-5: #0284c7;
   --radius: 0.7rem;
-  /* Sidebar: soft indigo-tinted panel, clearly separated from the content. */
-  --sidebar: oklch(0.945 0.014 277);
-  --sidebar-foreground: oklch(0.24 0.03 277);
+  /* Sidebar: deeper indigo-tinted panel, clearly separated from the content. */
+  --sidebar: oklch(0.9 0.022 277);
+  --sidebar-foreground: oklch(0.22 0.03 277);
   --sidebar-primary: oklch(0.51 0.23 277);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.9 0.035 277);
-  --sidebar-accent-foreground: oklch(0.38 0.18 277);
-  --sidebar-border: oklch(0.88 0.02 277);
+  --sidebar-accent: oklch(0.84 0.045 277);
+  --sidebar-accent-foreground: oklch(0.36 0.18 277);
+  --sidebar-border: oklch(0.82 0.03 277);
   --sidebar-ring: oklch(0.51 0.23 277);
   --background: oklch(0.977 0.005 277);
   --foreground: oklch(0.2 0.02 277);

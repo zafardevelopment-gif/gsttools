@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { publicEnv } from "@/lib/env";
 import { formatINR } from "@/lib/money";
 
-export const metadata = { title: "Invoice · GST Billing" };
+export const metadata = { title: "Invoice · AI Munim" };
 
 export default async function InvoiceDetailPage({
   params,

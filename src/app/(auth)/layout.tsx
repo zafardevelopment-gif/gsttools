@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -16,18 +15,19 @@ export default function AuthLayout({
 
       <Link
         href="/"
-        className="mb-8 flex items-center gap-2 text-lg font-bold tracking-tight"
+        className="mb-8 flex flex-col items-center gap-2 text-xl font-bold tracking-tight"
       >
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <FileText className="size-5" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/ai-munim.svg" alt="AI Munim" className="size-14 rounded-2xl shadow-md" />
+        <span>
+          AI <span className="text-emerald-600 dark:text-emerald-400">Munim</span>
         </span>
-        GST Billing
       </Link>
 
       {children}
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Simple GST billing &amp; accounting for Indian businesses.
+        WhatsApp pe business. AI pe bharosa.
       </p>
     </div>
   );

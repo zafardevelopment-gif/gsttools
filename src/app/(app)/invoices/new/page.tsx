@@ -6,7 +6,7 @@ import { requireActiveContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { VOUCHER_TYPES, type VoucherTypeKey } from "@/lib/constants";
 
-export const metadata = { title: "New invoice · GST Billing" };
+export const metadata = { title: "New invoice · AI Munim" };
 
 export default async function NewInvoicePage({
   searchParams,

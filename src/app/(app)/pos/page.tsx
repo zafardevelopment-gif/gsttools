@@ -5,7 +5,7 @@ import { requireActiveContext } from "@/lib/tenant";
 import { createClient } from "@/lib/supabase/server";
 import { PosClient } from "./pos-client";
 
-export const metadata = { title: "POS Billing · GST Billing" };
+export const metadata = { title: "POS Billing · AI Munim" };
 export const dynamic = "force-dynamic";
 
 export default async function PosPage() {
