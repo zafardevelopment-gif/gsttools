@@ -5,6 +5,9 @@ import { TenantSwitcher } from "@/components/layout/tenant-switcher";
 import { UserMenu } from "@/components/layout/user-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getAppContext } from "@/server/queries/app-context";
+import { getUser } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/admin";
+import { ShieldCheck } from "lucide-react";
 
 export default async function AppLayout({
   children,
@@ -12,6 +15,8 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const ctx = await getAppContext();
+  const user = await getUser();
+  const superAdmin = isSuperAdmin(user?.email);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -32,6 +37,14 @@ export default async function AppLayout({
           <TenantSwitcher tenants={ctx.tenants} activeTenantId={ctx.tenantId} />
         </div>
         <div className="flex items-center gap-1">
+          {superAdmin && (
+            <Link
+              href="/admin"
+              className="mr-1 flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-500/25 dark:text-amber-400"
+            >
+              <ShieldCheck className="size-3.5" /> Super Admin
+            </Link>
+          )}
           <ThemeToggle />
           <UserMenu label={ctx.userLabel} />
         </div>

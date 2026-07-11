@@ -55,7 +55,8 @@ export async function devSignIn(
     maxAge: 60 * 60 * 24 * 30, // 30 days
   });
 
-  redirect("/dashboard");
+  // Superadmin lands on the platform panel, end users on their dashboard.
+  redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
 }
 
 /** Sign the user out and return to the login page. */

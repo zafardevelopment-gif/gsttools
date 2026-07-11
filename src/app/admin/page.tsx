@@ -39,17 +39,54 @@ export default async function AdminPage() {
     salesByTenant.set(i.tenant_id, (salesByTenant.get(i.tenant_id) ?? 0) + i.total_paise);
   }
 
+  const totalSalesPaise = [...salesByTenant.values()].reduce((s, v) => s + v, 0);
+  const activeSubs = (subs ?? []).filter(
+    (s) => s.status === "active" || s.status === "trialing",
+  ).length;
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Super Admin</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/10 via-card to-card px-5 py-4">
+        <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ai-munim.svg" alt="AI Munim" className="size-10 rounded-xl" />
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-extrabold tracking-tight">
+              Super Admin
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+                Platform
+              </span>
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              AI Munim — saare tenants ka internal control panel
+            </p>
+          </div>
+        </div>
         <Link href="/dashboard" className="text-sm text-muted-foreground hover:underline">
           ← Back to app
         </Link>
       </div>
-      <p className="mb-4 text-sm text-muted-foreground">
-        {tenants?.length ?? 0} tenant(s).
-      </p>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Total tenants
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{tenants?.length ?? 0}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Active / trialing subs
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{activeSubs}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Platform lifetime sales
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{formatINR(totalSalesPaise)}</p>
+        </div>
+      </div>
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
