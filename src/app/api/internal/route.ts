@@ -6,6 +6,7 @@ import {
   type CreateBillInput,
 } from "@/server/billing/whatsapp-bill";
 import { formatINR, rupeesToPaise } from "@/lib/money";
+import type { Json } from "@/lib/database.types";
 
 /**
  * Internal API for n8n workflows (and other trusted automations).
@@ -20,8 +21,13 @@ import { formatINR, rupeesToPaise } from "@/lib/money";
  *   create_reminder{ tenant_id, party_id }
  *
  * WhatsApp billing (DukaanMitra Module 2 — n8n parses voice/text, calls these):
- *   create_bill        { tenant_id, customer?{name,phone}, items[{name,qty,rate?}],
+ *   create_bill        { tenant_id, from, customer?{name,phone}, items[{name,qty,rate?}],
  *                        payment_mode?, voucher_type?, notes? }        (B01/B04/B06/B07)
+ *     `from` = owner's WhatsApp number (sender). If any item isn't in the
+ *     Items catalog, this returns { ok:true, needs_confirmation:true, question }
+ *     instead of creating the bill — reply is resolved via resolve_pending.
+ *   resolve_pending    { tenant_id, from, reply_text }
+ *     Answers a pending create_bill confirmation (haan/nahi) for this `from`.
  *   record_payment     { tenant_id, party{name|phone}, amount, mode? } (B04 partial)
  *   today_summary      { tenant_id, date? }                            (B06/W02)
  *   outstanding_list   { tenant_id }                                   (B04)
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
 
   switch (action) {
     case "create_bill": {
+      const fromPhone = String(body.from ?? "");
       const result = await createWhatsappBill({
         tenantId,
         customer: body.customer as CreateBillInput["customer"],
@@ -93,7 +100,98 @@ export async function POST(req: NextRequest) {
         autoShare: body.auto_share !== false,
       });
       if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+
+      if (result.needsConfirmation) {
+        if (!fromPhone) {
+          // No sender number to ask — fall back to adding immediately.
+          const forced = await createWhatsappBill({
+            tenantId,
+            customer: body.customer as CreateBillInput["customer"],
+            items: (body.items as CreateBillInput["items"]) ?? [],
+            paymentMode: body.payment_mode as CreateBillInput["paymentMode"],
+            voucherType: body.voucher_type as CreateBillInput["voucherType"],
+            notes: body.notes ? String(body.notes) : undefined,
+            autoShare: body.auto_share !== false,
+            forceAddUnmatched: true,
+          });
+          if (forced.error) return NextResponse.json({ error: forced.error }, { status: 400 });
+          return NextResponse.json(forced);
+        }
+
+        const list = result.unmatchedItems!
+          .map((i) => `${i.name} @ Rs${i.rate}`)
+          .join(", ");
+        const question = `"${list}" catalog me nahi hai. Naya item is rate par add karke bill banau? Reply karein: Haan ya Nahi.`;
+        await admin.from("aimunim_pending_actions").insert({
+          tenant_id: tenantId,
+          phone: fromPhone,
+          action: "create_bill",
+          payload: body as unknown as Json,
+          question,
+        });
+        return NextResponse.json({ ok: true, needs_confirmation: true, question });
+      }
+
       return NextResponse.json(result);
+    }
+
+    case "resolve_pending": {
+      const fromPhone = String(body.from ?? "");
+      const replyText = String(body.reply_text ?? "").trim().toLowerCase();
+      if (!fromPhone) return NextResponse.json({ error: "from is required" }, { status: 400 });
+
+      const { data: pending } = await admin
+        .from("aimunim_pending_actions")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("phone", fromPhone)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!pending) return NextResponse.json({ ok: true, no_pending: true });
+
+      const isYes = /^(haan|han|ha|hn|yes|y|ok|okay|okey|theek hai|thik hai|theek|thik|kar do|sahi|add karo|add kar do)/.test(
+        replyText,
+      );
+      const isNo = /^(nahi|nahin|no|n|mat|cancel|rehne do|chodo)/.test(replyText);
+
+      await admin.from("aimunim_pending_actions").delete().eq("id", pending.id);
+
+      if (isNo) {
+        return NextResponse.json({ ok: true, cancelled: true });
+      }
+
+      if (!isYes) {
+        // Ask again — re-insert with a fresh expiry.
+        await admin.from("aimunim_pending_actions").insert({
+          tenant_id: tenantId,
+          phone: fromPhone,
+          action: pending.action,
+          payload: pending.payload,
+          question: pending.question,
+        });
+        return NextResponse.json({ ok: true, unclear: true, question: pending.question });
+      }
+
+      if (pending.action === "create_bill") {
+        const payload = pending.payload as unknown as Record<string, unknown>;
+        const result = await createWhatsappBill({
+          tenantId,
+          customer: payload.customer as CreateBillInput["customer"],
+          items: (payload.items as CreateBillInput["items"]) ?? [],
+          paymentMode: payload.payment_mode as CreateBillInput["paymentMode"],
+          voucherType: payload.voucher_type as CreateBillInput["voucherType"],
+          notes: payload.notes ? String(payload.notes) : undefined,
+          autoShare: payload.auto_share !== false,
+          forceAddUnmatched: true,
+        });
+        if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+        return NextResponse.json(result);
+      }
+
+      return NextResponse.json({ error: `Unknown pending action "${pending.action}"` }, { status: 400 });
     }
 
     case "record_payment": {

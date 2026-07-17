@@ -30,11 +30,20 @@ export type CreateBillInput = {
   notes?: string;
   /** Send the PDF to the customer on WhatsApp (default true). */
   autoShare?: boolean;
+  /**
+   * Skip the "item not in catalog, add karu?" confirmation and add unmatched
+   * items straight away. Set this only when the owner has already confirmed
+   * (see resolve_pending in the internal API).
+   */
+  forceAddUnmatched?: boolean;
 };
 
 export type CreateBillResult = {
   ok?: true;
   error?: string;
+  /** One or more items weren't in the Items catalog — ask before adding them. */
+  needsConfirmation?: true;
+  unmatchedItems?: { name: string; rate: number }[];
   bill?: {
     id: string;
     number: string;
@@ -162,6 +171,7 @@ export async function createWhatsappBill(
     isProduct: boolean;
     matched: boolean;
   }[] = [];
+  const unmatchedItems: { name: string; rate: number }[] = [];
 
   for (const line of input.items) {
     if (!line.name || !(line.qty > 0)) return { error: `Invalid line: ${line.name}` };
@@ -191,24 +201,53 @@ export async function createWhatsappBill(
         isProduct: match.type === "product",
         matched: true,
       });
-    } else {
-      if (line.rate == null) {
-        return {
-          error: `"${line.name}" catalog me nahi mila aur rate nahi bataya. Rate ke saath dobara bolen.`,
-        };
-      }
-      resolved.push({
-        itemId: null,
-        name: line.name,
-        hsn: null,
-        unit: "PCS",
-        qty: line.qty,
-        ratePaise: rupeesToPaise(line.rate),
-        taxRate: 0,
-        isProduct: false,
-        matched: false,
-      });
+      continue;
     }
+
+    if (line.rate == null) {
+      return {
+        error: `"${line.name}" catalog me nahi mila aur rate nahi bataya. Rate ke saath dobara bolen.`,
+      };
+    }
+
+    if (!input.forceAddUnmatched) {
+      // Don't guess — ask the owner before adding a new item to the catalog.
+      unmatchedItems.push({ name: line.name, rate: line.rate });
+      continue;
+    }
+
+    const ratePaise = rupeesToPaise(line.rate);
+    // Owner already confirmed (forceAddUnmatched) — add it to the catalog
+    // now so it shows up in the Items list and matches next time.
+    const { data: newItem } = await admin
+      .from("aimunim_items")
+      .insert({
+        tenant_id: input.tenantId,
+        type: "product",
+        name: line.name,
+        unit: "PCS",
+        sale_price_paise: ratePaise,
+        tax_rate: 0,
+      })
+      .select("id")
+      .single();
+    resolved.push({
+      itemId: newItem?.id ?? null,
+      name: line.name,
+      hsn: null,
+      unit: "PCS",
+      qty: line.qty,
+      ratePaise,
+      taxRate: 0,
+      // No prior stock baseline for a brand-new item, so skip the stock
+      // movement on this first sale (would otherwise go negative).
+      isProduct: false,
+      matched: false,
+    });
+  }
+
+  if (unmatchedItems.length && !input.forceAddUnmatched) {
+    return { ok: true, needsConfirmation: true, unmatchedItems };
   }
 
   const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;

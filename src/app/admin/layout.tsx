@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { isSuperAdmin } from "@/lib/admin";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/layout/user-menu";
+import { AdminNav } from "@/components/admin/admin-nav";
 
 export const metadata: Metadata = { title: "Super Admin · AI Munim" };
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export default async function AdminLayout({
             <UserMenu label={user.email ?? "Super admin"} />
           </div>
         </div>
+        <AdminNav />
       </header>
       <main className="flex-1">{children}</main>
     </div>

@@ -446,6 +446,17 @@ export type AuditLogRow = {
   created_at: string;
 }
 
+export type PendingActionRow = {
+  id: string;
+  tenant_id: string;
+  phone: string;
+  action: string;
+  payload: Json;
+  question: string;
+  created_at: string;
+  expires_at: string;
+}
+
 // Insert = Row without DB-generated fields; Update = partial insert.
 type Generated = "id" | "created_at" | "updated_at";
 type Insert<T, ReqKeep extends keyof T = never> = Partial<Omit<T, Generated>> &
@@ -488,6 +499,7 @@ export type Database = {
       aimunim_payslips: TableDef<PayslipRow, Insert<PayslipRow, "tenant_id" | "staff_id" | "month">, Partial<PayslipRow>>;
       aimunim_online_orders: TableDef<OnlineOrderRow, Insert<OnlineOrderRow, "tenant_id" | "order_number" | "customer_name" | "customer_phone">, Partial<OnlineOrderRow>>;
       aimunim_campaigns: TableDef<CampaignRow, Insert<CampaignRow, "tenant_id" | "name">, Partial<CampaignRow>>;
+      aimunim_pending_actions: TableDef<PendingActionRow, Insert<PendingActionRow, "tenant_id" | "phone" | "action" | "payload" | "question">, Partial<PendingActionRow>>;
     };
     Views: Record<string, never>;
     Functions: {
