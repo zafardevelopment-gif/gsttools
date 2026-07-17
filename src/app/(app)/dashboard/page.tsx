@@ -30,15 +30,23 @@ function Stat({
   sub,
   icon: Icon,
   accent = "var(--color-chart-1)",
+  href,
 }: {
   label: string;
   value: string;
   sub?: string;
   icon: LucideIcon;
   accent?: string;
+  href?: string;
 }) {
-  return (
-    <Card className="relative overflow-hidden">
+  const card = (
+    <Card
+      className={
+        href
+          ? "relative overflow-hidden transition-colors hover:bg-accent/40"
+          : "relative overflow-hidden"
+      }
+    >
       <span
         aria-hidden
         className="absolute inset-x-0 top-0 h-1"
@@ -60,6 +68,14 @@ function Stat({
         </span>
       </CardContent>
     </Card>
+  );
+
+  return href ? (
+    <Link href={href} className="block">
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
 
@@ -146,19 +162,20 @@ export default async function DashboardPage() {
       <SetupGuide steps={setupSteps} />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Today's sales" value={formatINR(stats.todaySalesPaise)} icon={TrendingUp} accent="var(--color-chart-1)" />
-        <Stat label="This month sales" value={formatINR(stats.monthSalesPaise)} icon={CalendarDays} accent="var(--color-chart-1)" />
-        <Stat label="Today's collection" value={formatINR(stats.todayCollectionPaise)} icon={Wallet} accent="var(--color-chart-3)" />
-        <Stat label="Stock value" value={formatINR(stats.stockValuePaise)} icon={Boxes} accent="var(--color-chart-2)" />
-        <Stat label="Receivables" value={formatINR(stats.receivablesPaise)} sub="Money owed to you" icon={ArrowDownToLine} accent="var(--color-chart-3)" />
-        <Stat label="Payables" value={formatINR(stats.payablesPaise)} sub="You owe suppliers" icon={ArrowUpFromLine} accent="var(--color-chart-5)" />
-        <Stat label="This month expenses" value={formatINR(stats.monthExpensesPaise)} icon={Receipt} accent="var(--color-chart-4)" />
+        <Stat label="Today's sales" value={formatINR(stats.todaySalesPaise)} icon={TrendingUp} accent="var(--color-chart-1)" href="/invoices" />
+        <Stat label="This month sales" value={formatINR(stats.monthSalesPaise)} icon={CalendarDays} accent="var(--color-chart-1)" href="/invoices" />
+        <Stat label="Today's collection" value={formatINR(stats.todayCollectionPaise)} icon={Wallet} accent="var(--color-chart-3)" href="/payments" />
+        <Stat label="Stock value" value={formatINR(stats.stockValuePaise)} icon={Boxes} accent="var(--color-chart-2)" href="/items" />
+        <Stat label="Receivables" value={formatINR(stats.receivablesPaise)} sub="Money owed to you" icon={ArrowDownToLine} accent="var(--color-chart-3)" href="/parties" />
+        <Stat label="Payables" value={formatINR(stats.payablesPaise)} sub="You owe suppliers" icon={ArrowUpFromLine} accent="var(--color-chart-5)" href="/parties" />
+        <Stat label="This month expenses" value={formatINR(stats.monthExpensesPaise)} icon={Receipt} accent="var(--color-chart-4)" href="/expenses" />
         <Stat
           label="Low-stock items"
           value={String(stats.lowStock.length)}
           sub={stats.lowStock.length ? "Needs reordering" : "All good"}
           icon={PackageSearch}
           accent={stats.lowStock.length ? "var(--color-destructive)" : "var(--color-chart-3)"}
+          href="/items"
         />
       </div>
 
