@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: "AI Munim — Invoicing for Indian businesses",
   description:
     "Simple GST billing, inventory, parties, payments and reports for Indian small businesses.",
+  icons: {
+    icon: "/ai-munim.svg",
+    shortcut: "/ai-munim.svg",
+    apple: "/ai-munim.svg",
+  },
 };
 
 export default function RootLayout({
