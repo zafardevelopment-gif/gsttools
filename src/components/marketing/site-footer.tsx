@@ -9,7 +9,7 @@ const PRODUCT_LINKS = [
 
 const ACCOUNT_LINKS = [
   { href: "/login", label: "Log in" },
-  { href: "/login", label: "Start free trial" },
+  { href: "/signup", label: "Start free trial" },
 ];
 
 export function SiteFooter() {

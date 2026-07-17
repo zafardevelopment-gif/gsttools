@@ -127,7 +127,7 @@ export function PricingSection({
                 className="mt-6"
                 variant={card.highlight ? "default" : "outline"}
               >
-                <Link href="/login">Start free trial</Link>
+                <Link href="/signup">Start free trial</Link>
               </Button>
 
               <p className="mt-3 text-center text-xs text-muted-foreground">

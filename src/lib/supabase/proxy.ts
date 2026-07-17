@@ -21,6 +21,8 @@ import { publicEnv, isSupabaseConfigured } from "@/lib/env";
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/signup",
+  "/pricing",
   "/auth",
   "/api/health",
   "/share",

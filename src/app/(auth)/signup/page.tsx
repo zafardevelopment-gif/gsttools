@@ -2,7 +2,7 @@
 
 import { Suspense, useActionState } from "react";
 import Link from "next/link";
-import { devSignIn, type DevSignInState } from "@/server/actions/auth";
+import { signUpAction, type SignUpState } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,29 +14,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   return (
     <Suspense
       fallback={
         <div className="text-sm text-muted-foreground">Loading…</div>
       }
     >
-      <LoginForm />
+      <SignUpForm />
     </Suspense>
   );
 }
 
-function LoginForm() {
-  const [state, formAction, pending] = useActionState<DevSignInState, FormData>(
-    devSignIn,
+function SignUpForm() {
+  const [state, formAction, pending] = useActionState<SignUpState, FormData>(
+    signUpAction,
     {},
   );
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>Log in</CardTitle>
-        <CardDescription>Sign in with your email and password.</CardDescription>
+        <CardTitle>Create your account</CardTitle>
+        <CardDescription>
+          Start your 14-day free trial — no card required.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
@@ -47,7 +49,7 @@ function LoginForm() {
               name="email"
               type="email"
               autoComplete="username"
-              placeholder="user@aimunim.local"
+              placeholder="you@business.com"
               required
               disabled={pending}
             />
@@ -59,8 +61,23 @@ function LoginForm() {
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               placeholder="••••••••"
+              minLength={6}
+              required
+              disabled={pending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              placeholder="••••••••"
+              minLength={6}
               required
               disabled={pending}
             />
@@ -73,13 +90,13 @@ function LoginForm() {
           )}
 
           <Button className="w-full" type="submit" disabled={pending}>
-            {pending ? "Signing in…" : "Log in"}
+            {pending ? "Creating account…" : "Get started — 14-day free trial"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            New here?{" "}
-            <Link href="/signup" className="font-medium text-foreground hover:underline">
-              Create an account
+            Already have an account?{" "}
+            <Link href="/login" className="font-medium text-foreground hover:underline">
+              Log in
             </Link>
           </p>
         </form>

@@ -173,7 +173,7 @@ export default function PricingPage() {
               variant="secondary"
               className="mt-8 h-11 px-6 text-base"
             >
-              <Link href="/login">
+              <Link href="/signup">
                 Get started for free
                 <ArrowRight />
               </Link>

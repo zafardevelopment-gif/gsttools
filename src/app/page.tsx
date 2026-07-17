@@ -152,7 +152,7 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Button asChild size="lg" className="h-11 px-5 text-base">
-                  <Link href="/login">
+                  <Link href="/signup">
                     Get started — 14-day free trial
                     <ArrowRight />
                   </Link>
@@ -360,7 +360,7 @@ export default function Home() {
               variant="secondary"
               className="mt-8 h-11 px-6 text-base"
             >
-              <Link href="/login">
+              <Link href="/signup">
                 Get started for free
                 <ArrowRight />
               </Link>

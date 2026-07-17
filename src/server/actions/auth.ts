@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -57,6 +58,57 @@ export async function devSignIn(
 
   // Superadmin lands on the platform panel, end users on their dashboard.
   redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
+}
+
+const signUpSchema = z
+  .object({
+    email: z.string().trim().email("Enter a valid email."),
+    password: z.string().min(6, "Password must be at least 6 characters."),
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: "Passwords don't match.",
+    path: ["confirmPassword"],
+  });
+
+export type SignUpState = { error?: string };
+
+/**
+ * Public signup — creates a real Supabase auth.users account and signs the
+ * browser into that session. No business/tenant exists yet at this point;
+ * onboarding/page.tsx (via requireUser + getActiveContext) picks that up
+ * next and walks them through creating one. Disabled in dev-auth-bypass
+ * mode, where /login's hardcoded personas are the only way in.
+ */
+export async function signUpAction(
+  _prev: SignUpState,
+  formData: FormData,
+): Promise<SignUpState> {
+  if (authDisabled) {
+    return { error: "Signup is disabled in dev mode. Use the dev login instead." };
+  }
+
+  const parsed = signUpSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  const { email, password } = parsed.data;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    return {
+      error: error.message.toLowerCase().includes("already registered")
+        ? "An account with that email already exists — log in instead."
+        : error.message,
+    };
+  }
+
+  redirect("/onboarding");
 }
 
 /** Sign the user out and return to the login page. */
