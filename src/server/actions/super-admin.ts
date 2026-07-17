@@ -30,6 +30,18 @@ const DB_STATUS_VALUES = [
 ] as const;
 export type DbStatusKey = (typeof DB_STATUS_VALUES)[number];
 
+const MEMBERSHIP_ROLES = [
+  "owner",
+  "admin",
+  "partner",
+  "ca",
+  "salesman",
+  "stock_manager",
+  "delivery_boy",
+  "staff",
+] as const;
+export type MembershipRoleKey = (typeof MEMBERSHIP_ROLES)[number];
+
 async function requireSuperAdmin() {
   const user = await requireUser();
   if (!isSuperAdmin(user.email)) {
@@ -121,6 +133,65 @@ export async function updateTenantPlanAction(
   if (tenantError) return { error: tenantError.message };
 
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+/**
+ * Create a brand-new auth.users account and assign it straight to a chosen
+ * tenant — the platform-level equivalent of a tenant's own "create new
+ * user" flow (see server/actions/users.ts createUserAction), for when
+ * support/onboarding needs to hand a business its first login without the
+ * owner doing it themselves.
+ */
+export async function createPlatformUserAction(input: {
+  tenantId: string;
+  email: string;
+  password: string;
+  role: MembershipRoleKey;
+}): Promise<ActionResult> {
+  try {
+    await requireSuperAdmin();
+  } catch {
+    return { error: "Forbidden." };
+  }
+  if (!MEMBERSHIP_ROLES.includes(input.role)) return { error: "Unknown role." };
+  if (input.password.length < 6) {
+    return { error: "Password must be at least 6 characters." };
+  }
+
+  const admin = createAdminClient();
+  const { data: tenant } = await admin
+    .from("aimunim_tenants")
+    .select("id")
+    .eq("id", input.tenantId)
+    .maybeSingle();
+  if (!tenant) return { error: "Tenant not found." };
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+  });
+  if (createErr || !created.user) {
+    return {
+      error:
+        createErr?.message?.includes("already been registered")
+          ? "An account with that email already exists."
+          : (createErr?.message ?? "Could not create the account."),
+    };
+  }
+
+  const { error: memberErr } = await admin.from("aimunim_memberships").insert({
+    tenant_id: input.tenantId,
+    user_id: created.user.id,
+    role: input.role,
+  });
+  if (memberErr) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    return { error: memberErr.message };
+  }
+
+  revalidatePath("/admin/users");
   return { ok: true };
 }
 

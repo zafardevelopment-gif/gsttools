@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { UserPlus, Trash2 } from "lucide-react";
 import {
   inviteUserAction,
+  createUserAction,
   changeRoleAction,
   removeMemberAction,
 } from "@/server/actions/users";
@@ -36,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const ROLES = [
   { key: "owner", label: "Owner" },
@@ -54,19 +56,38 @@ export function InviteUserDialog() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [role, setRole] = useState<RoleKey>("staff");
+  const [inviteRole, setInviteRole] = useState<RoleKey>("staff");
+  const [createRole, setCreateRole] = useState<RoleKey>("staff");
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function onInvite(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await inviteUserAction({
         email: String(fd.get("email") ?? ""),
-        role,
+        role: inviteRole,
       });
       if (res.error) toast.error(res.error);
       else {
         toast.success("Member added.");
+        setOpen(false);
+        router.refresh();
+      }
+    });
+  }
+
+  function onCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await createUserAction({
+        email: String(fd.get("email") ?? ""),
+        password: String(fd.get("password") ?? ""),
+        role: createRole,
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Account created and added.");
         setOpen(false);
         router.refresh();
       }
@@ -84,37 +105,91 @@ export function InviteUserDialog() {
         <DialogHeader>
           <DialogTitle>Add a team member</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="inv_email">Email</Label>
-            <Input
-              id="inv_email"
-              name="email"
-              type="email"
-              placeholder="teammate@example.com"
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              The person must already have an account (sign up / SQL user script).
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Role</Label>
-            <Select value={role} onValueChange={(v) => setRole(v as RoleKey)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {ROLES.map((r) => (
-                  <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Adding…" : "Add member"}
-            </Button>
-          </DialogFooter>
-        </form>
+        <Tabs defaultValue="create">
+          <TabsList className="w-full">
+            <TabsTrigger value="create" className="flex-1">New account</TabsTrigger>
+            <TabsTrigger value="invite" className="flex-1">Invite existing</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="create">
+            <form onSubmit={onCreate} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="create_email">Email</Label>
+                <Input
+                  id="create_email"
+                  name="email"
+                  type="email"
+                  placeholder="teammate@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="create_password">Password</Label>
+                <Input
+                  id="create_password"
+                  name="password"
+                  type="text"
+                  placeholder="Set a temporary password"
+                  minLength={6}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Share this with them — they can change it after logging in.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={createRole} onValueChange={(v) => setCreateRole(v as RoleKey)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={pending}>
+                  {pending ? "Creating…" : "Create & add"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="invite">
+            <form onSubmit={onInvite} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="inv_email">Email</Label>
+                <Input
+                  id="inv_email"
+                  name="email"
+                  type="email"
+                  placeholder="teammate@example.com"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  The person must already have an account.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as RoleKey)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r.key} value={r.key}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={pending}>
+                  {pending ? "Adding…" : "Add member"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

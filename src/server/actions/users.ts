@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { logAudit } from "@/server/audit";
+import { PLANS } from "@/lib/constants";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -73,6 +74,85 @@ export async function inviteUserAction(
     tenantId,
     userId,
     action: "member.invited",
+    entityType: "membership",
+    data: { email: v.email, role: v.role },
+  });
+  revalidatePath("/users");
+  return { ok: true };
+}
+
+const createUserSchema = z.object({
+  email: z.string().trim().email("Enter a valid email."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  role: z.enum(ROLES).default("staff"),
+});
+
+/**
+ * Create a brand-new auth.users account (no existing signup needed) and add
+ * it to this business in one step. Unlike inviteUserAction, this mints the
+ * credentials itself via the service-role admin API, so the owner/admin can
+ * hand the email+password straight to the new team member.
+ */
+export async function createUserAction(
+  input: z.input<typeof createUserSchema>,
+): Promise<ActionResult> {
+  const parsed = createUserSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  const v = parsed.data;
+
+  const { tenantId, userId, role } = await requireActiveContext();
+  if (role !== "owner" && role !== "admin") {
+    return { error: "Only an owner or admin can manage users." };
+  }
+
+  const admin = createAdminClient();
+
+  const { count } = await admin
+    .from("aimunim_memberships")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId);
+  const { data: tenant } = await admin
+    .from("aimunim_tenants")
+    .select("plan")
+    .eq("id", tenantId)
+    .single();
+  if (tenant) {
+    const limit = PLANS[tenant.plan as keyof typeof PLANS]?.limits.users ?? Infinity;
+    if ((count ?? 0) >= limit) {
+      return { error: `Your plan allows up to ${limit} user(s). Upgrade to add more.` };
+    }
+  }
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
+    email: v.email,
+    password: v.password,
+    email_confirm: true,
+  });
+  if (createErr || !created.user) {
+    return {
+      error:
+        createErr?.message?.includes("already been registered")
+          ? "An account with that email already exists — use Invite instead."
+          : (createErr?.message ?? "Could not create the account."),
+    };
+  }
+
+  const { error: memberErr } = await admin.from("aimunim_memberships").insert({
+    tenant_id: tenantId,
+    user_id: created.user.id,
+    role: v.role,
+  });
+  if (memberErr) {
+    // Roll back the orphaned auth user so a failed insert doesn't leave a
+    // dangling account nobody can invite (email already "taken").
+    await admin.auth.admin.deleteUser(created.user.id);
+    return { error: memberErr.message };
+  }
+
+  logAudit({
+    tenantId,
+    userId,
+    action: "member.created",
     entityType: "membership",
     data: { email: v.email, role: v.role },
   });

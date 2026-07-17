@@ -8,6 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -48,12 +49,15 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every user with access to a business on AI Munim, across all
-          tenants.
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Every user with access to a business on AI Munim, across all
+            tenants.
+          </p>
+        </div>
+        <CreateUserDialog tenants={(tenants ?? []).map((t) => ({ id: t.id, name: t.name }))} />
       </div>
 
       <div className="mb-6 rounded-xl border bg-card p-4">
