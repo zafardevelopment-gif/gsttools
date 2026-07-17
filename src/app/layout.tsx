@@ -19,8 +19,11 @@ export const metadata: Metadata = {
   description:
     "Simple GST billing, inventory, parties, payments and reports for Indian small businesses.",
   icons: {
-    icon: "/ai-munim.svg",
-    shortcut: "/ai-munim.svg",
+    // Tab favicon: a simplified mark (bold "AI" on the brand tile) — the
+    // full detailed logo (network nodes, thin strokes) turns to mush at the
+    // 16px size browsers render tabs at, so it gets a dedicated simpler file.
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
     apple: "/ai-munim.svg",
   },
 };
