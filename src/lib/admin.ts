@@ -1,6 +1,5 @@
 import "server-only";
-import { getServerEnv, authDisabled } from "@/lib/env";
-import { DEV_SUPERADMIN_EMAIL } from "@/lib/auth";
+import { getServerEnv, authDisabled, DEV_SUPERADMIN_EMAIL } from "@/lib/env";
 
 /** True if the email is in the SUPERADMIN_EMAILS allow-list (case-insensitive). */
 export function isSuperAdmin(email?: string | null): boolean {

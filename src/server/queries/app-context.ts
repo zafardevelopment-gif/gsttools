@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth";
+import { isSuperAdmin } from "@/lib/admin";
 import { authDisabled } from "@/lib/env";
 import type { TenantRow } from "@/lib/database.types";
 
@@ -11,6 +12,14 @@ export type AppContext = {
   userLabel: string;
   activeTenant: TenantRow;
   tenants: { tenantId: string; name: string }[];
+  /** True if the signed-in user is on the SUPERADMIN_EMAILS allow-list. */
+  isSuperAdmin: boolean;
+  /**
+   * True when a super admin is viewing this tenant via "View as" (/admin)
+   * rather than as an actual member - the app shell shows a banner instead
+   * of silently pretending they own the business.
+   */
+  impersonating: boolean;
 };
 
 /**
@@ -20,6 +29,7 @@ export type AppContext = {
  */
 export async function getAppContext(): Promise<AppContext> {
   const { user, userId, tenantId, role } = await requireTenant();
+  const superAdmin = isSuperAdmin(user.email);
 
   // Dev mode: no Supabase auth session, so RLS would return nothing. Load the
   // demo tenant directly with the service client so the shell has a tenant.
@@ -37,6 +47,10 @@ export async function getAppContext(): Promise<AppContext> {
       userLabel: user.phone || user.email || "Demo",
       activeTenant: tenant as TenantRow,
       tenants: tenant ? [{ tenantId: tenant.id, name: tenant.name }] : [],
+      isSuperAdmin: superAdmin,
+      // The dev "superadmin" persona never has a real membership - landing
+      // here at all means they explicitly chose "View as" from /admin.
+      impersonating: superAdmin,
     };
   }
 
@@ -50,10 +64,24 @@ export async function getAppContext(): Promise<AppContext> {
 
   const tenantIds = (memberships ?? []).map((m) => m.tenant_id);
 
-  const { data: tenantRows } = await supabase
-    .from("aimunim_tenants")
-    .select("*")
-    .in("id", tenantIds.length ? tenantIds : ["00000000-0000-0000-0000-000000000000"]);
+  let tenantRows: TenantRow[] | null = null;
+  if (tenantIds.length > 0) {
+    const { data } = await supabase
+      .from("aimunim_tenants")
+      .select("*")
+      .in("id", tenantIds);
+    tenantRows = data;
+  } else if (superAdmin) {
+    // No memberships - this is a super admin "viewing as" a tenant they
+    // don't belong to. Fetch it with the service client (bypasses RLS);
+    // access was already gated on isSuperAdmin() in getActiveContext().
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("aimunim_tenants")
+      .select("*")
+      .eq("id", tenantId);
+    tenantRows = data;
+  }
 
   const tenants = (tenantRows ?? []).map((t) => ({
     tenantId: t.id,
@@ -70,5 +98,7 @@ export async function getAppContext(): Promise<AppContext> {
     userLabel: user.phone || user.email || "Account",
     activeTenant: activeTenant as TenantRow,
     tenants,
+    isSuperAdmin: superAdmin,
+    impersonating: superAdmin && tenantIds.length === 0,
   };
 }

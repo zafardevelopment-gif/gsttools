@@ -10,8 +10,9 @@
  * which tenant the UI is currently operating on; it never replaces RLS.
  */
 import { cookies } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { authDisabled, DEMO_TENANT_ID } from "@/lib/env";
+import { isSuperAdmin } from "@/lib/admin";
 
 export const ACTIVE_TENANT_COOKIE = "gst_active_tenant";
 
@@ -50,12 +51,30 @@ export async function getActiveContext(): Promise<ActiveContext | null> {
     .select("tenant_id, role")
     .order("created_at", { ascending: true });
 
-  if (!memberships || memberships.length === 0) return null;
+  if (memberships && memberships.length > 0) {
+    const chosen =
+      memberships.find((m) => m.tenant_id === requested) ?? memberships[0];
+    return { userId: user.id, tenantId: chosen.tenant_id, role: chosen.role };
+  }
 
-  const chosen =
-    memberships.find((m) => m.tenant_id === requested) ?? memberships[0];
+  // No memberships: a platform super admin can still be "viewing as" a tenant
+  // they explicitly picked from /admin (see server/actions/super-admin.ts,
+  // which is the only place that sets this cookie without a membership row).
+  // Bypasses RLS deliberately - access is gated on isSuperAdmin(), not on
+  // tenant membership, which is correct for platform staff support access.
+  if (requested && isSuperAdmin(user.email)) {
+    const admin = createAdminClient();
+    const { data: tenant } = await admin
+      .from("aimunim_tenants")
+      .select("id")
+      .eq("id", requested)
+      .maybeSingle();
+    if (tenant) {
+      return { userId: user.id, tenantId: tenant.id, role: "owner" };
+    }
+  }
 
-  return { userId: user.id, tenantId: chosen.tenant_id, role: chosen.role };
+  return null;
 }
 
 /** Throws if there is no active tenant context (use in actions/pages that require it). */
