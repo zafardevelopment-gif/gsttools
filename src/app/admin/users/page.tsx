@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
+import { UserRowActions } from "@/components/admin/user-row-actions";
+import type { MembershipRoleKey } from "@/server/actions/super-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +20,21 @@ const ROLE_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
   staff: "outline",
 };
 
+const PLAN_LABEL: Record<string, string> = {
+  trial: "Trial",
+  silver: "Silver",
+  gold: "Gold",
+  diamond: "Diamond",
+};
+
 /**
  * Every user with at least one tenant membership, across the whole
  * platform. Emails live in Supabase auth.users (not queryable via
  * postgrest), so they're fetched separately via the admin auth API and
- * joined in memory onto aimunim_memberships rows.
+ * joined in memory onto aimunim_memberships rows. Each row also shows the
+ * plan of the business it belongs to (plan is a tenant-level concept — a
+ * subscription belongs to the business, not the individual user) and has
+ * inline role-edit + delete actions for support/admin use.
  */
 export default async function AdminUsersPage() {
   const admin = createAdminClient();
@@ -32,20 +44,24 @@ export default async function AdminUsersPage() {
         .from("aimunim_memberships")
         .select("id, tenant_id, user_id, role, created_at")
         .order("created_at", { ascending: false }),
-      admin.from("aimunim_tenants").select("id, name"),
+      admin.from("aimunim_tenants").select("id, name, plan"),
       admin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
 
-  const tenantNameById = new Map((tenants ?? []).map((t) => [t.id, t.name]));
+  const tenantById = new Map((tenants ?? []).map((t) => [t.id, t]));
   const emailByUserId = new Map(
     (authUsers?.users ?? []).map((u) => [u.id, u.email ?? "—"]),
   );
 
-  const rows = (memberships ?? []).map((m) => ({
-    ...m,
-    email: emailByUserId.get(m.user_id) ?? "—",
-    tenantName: tenantNameById.get(m.tenant_id) ?? "—",
-  }));
+  const rows = (memberships ?? []).map((m) => {
+    const tenant = tenantById.get(m.tenant_id);
+    return {
+      ...m,
+      email: emailByUserId.get(m.user_id) ?? "—",
+      tenantName: tenant?.name ?? "—",
+      plan: tenant?.plan ? (PLAN_LABEL[tenant.plan] ?? tenant.plan) : "—",
+    };
+  });
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
@@ -73,8 +89,10 @@ export default async function AdminUsersPage() {
             <TableRow>
               <TableHead>Email</TableHead>
               <TableHead>Business</TableHead>
+              <TableHead>Plan</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Joined</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -84,6 +102,7 @@ export default async function AdminUsersPage() {
                 <TableCell className="text-muted-foreground">
                   {r.tenantName}
                 </TableCell>
+                <TableCell className="text-muted-foreground">{r.plan}</TableCell>
                 <TableCell>
                   <Badge variant={ROLE_VARIANT[r.role] ?? "outline"}>
                     {r.role}
@@ -92,12 +111,20 @@ export default async function AdminUsersPage() {
                 <TableCell className="text-muted-foreground">
                   {r.created_at.slice(0, 10)}
                 </TableCell>
+                <TableCell>
+                  <UserRowActions
+                    membershipId={r.id}
+                    userId={r.user_id}
+                    role={r.role as MembershipRoleKey}
+                    email={r.email}
+                  />
+                </TableCell>
               </TableRow>
             ))}
             {rows.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={4}
+                  colSpan={6}
                   className="py-10 text-center text-muted-foreground"
                 >
                   No users yet.

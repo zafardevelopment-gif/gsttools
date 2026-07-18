@@ -196,6 +196,78 @@ export async function createPlatformUserAction(input: {
 }
 
 /**
+ * Change a member's role within their tenant, from the platform Users page.
+ * Mirrors what a tenant owner can already do from their own Manage Users
+ * screen (server/actions/users.ts), just reachable for support/admin
+ * purposes without being a member of that tenant.
+ */
+export async function updateMembershipRoleAction(
+  membershipId: string,
+  role: MembershipRoleKey,
+): Promise<ActionResult> {
+  try {
+    await requireSuperAdmin();
+  } catch {
+    return { error: "Forbidden." };
+  }
+  if (!MEMBERSHIP_ROLES.includes(role)) return { error: "Unknown role." };
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("aimunim_memberships")
+    .update({ role })
+    .eq("id", membershipId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/users");
+  return { ok: true };
+}
+
+/**
+ * Permanently delete a user's auth.users account — memberships cascade-delete
+ * automatically (aimunim_memberships.user_id has ON DELETE CASCADE). Blocked
+ * when this would leave one of their tenants without any owner, since that
+ * tenant would then be unreachable through the normal app (nobody could add
+ * a new member); reassign ownership first in that case.
+ */
+export async function deleteUserAction(userId: string): Promise<ActionResult> {
+  try {
+    await requireSuperAdmin();
+  } catch {
+    return { error: "Forbidden." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: memberships } = await admin
+    .from("aimunim_memberships")
+    .select("tenant_id, role")
+    .eq("user_id", userId);
+
+  for (const m of memberships ?? []) {
+    if (m.role !== "owner") continue;
+    const { count } = await admin
+      .from("aimunim_memberships")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", m.tenant_id)
+      .eq("role", "owner");
+    if ((count ?? 0) <= 1) {
+      return {
+        error:
+          "This user is the only owner of at least one business — reassign ownership before deleting them.",
+      };
+    }
+  }
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/activity");
+  return { ok: true };
+}
+
+/**
  * Directly set a tenant's subscription status — this is how "suspend" works
  * today: there's no separate suspended flag, so setting status to
  * "canceled" (or "expired"/"past_due") makes isSubscriptionActive() return
