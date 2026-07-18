@@ -27,6 +27,7 @@ import {
   createPlatformUserAction,
   type MembershipRoleKey,
 } from "@/server/actions/super-admin";
+import { GST_STATE_CODES } from "@/lib/constants";
 
 const ROLES: { key: MembershipRoleKey; label: string }[] = [
   { key: "owner", label: "Owner" },
@@ -39,6 +40,9 @@ const ROLES: { key: MembershipRoleKey; label: string }[] = [
   { key: "staff", label: "Staff" },
 ];
 
+/** Sentinel Select value for "create a new business" instead of picking an existing one. */
+const NEW_BUSINESS = "__new__";
+
 export function CreateUserDialog({
   tenants,
 }: {
@@ -47,8 +51,12 @@ export function CreateUserDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [tenantId, setTenantId] = useState(tenants[0]?.id ?? "");
+  const [tenantId, setTenantId] = useState(tenants[0]?.id ?? NEW_BUSINESS);
   const [role, setRole] = useState<MembershipRoleKey>("staff");
+  const [newBusinessName, setNewBusinessName] = useState("");
+  const [newBusinessState, setNewBusinessState] = useState("");
+
+  const creatingNew = tenantId === NEW_BUSINESS;
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -56,18 +64,28 @@ export function CreateUserDialog({
       toast.error("Choose a business first.");
       return;
     }
+    if (creatingNew && (!newBusinessName.trim() || !newBusinessState)) {
+      toast.error("Enter a business name and state.");
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await createPlatformUserAction({
-        tenantId,
+        ...(creatingNew
+          ? { newBusiness: { name: newBusinessName, stateCode: newBusinessState } }
+          : { tenantId }),
         email: String(fd.get("email") ?? ""),
         password: String(fd.get("password") ?? ""),
         role,
       });
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Account created and assigned.");
+        toast.success(
+          creatingNew ? "Business and account created." : "Account created and assigned.",
+        );
         setOpen(false);
+        setNewBusinessName("");
+        setNewBusinessState("");
         refreshWithRetry(router);
       }
     });
@@ -111,12 +129,39 @@ export function CreateUserDialog({
             <Select value={tenantId} onValueChange={setTenantId}>
               <SelectTrigger><SelectValue placeholder="Choose a tenant" /></SelectTrigger>
               <SelectContent>
+                <SelectItem value={NEW_BUSINESS}>+ Create new business</SelectItem>
                 {tenants.map((t) => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {creatingNew && (
+            <div className="space-y-4 rounded-lg border bg-muted/30 p-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pu_business_name">New business name</Label>
+                <Input
+                  id="pu_business_name"
+                  value={newBusinessName}
+                  onChange={(e) => setNewBusinessName(e.target.value)}
+                  placeholder="e.g. Gupta Traders"
+                  required={creatingNew}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>State</Label>
+                <Select value={newBusinessState} onValueChange={setNewBusinessState}>
+                  <SelectTrigger><SelectValue placeholder="Choose a state" /></SelectTrigger>
+                  <SelectContent>
+                    {GST_STATE_CODES.map((s) => (
+                      <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>Role</Label>
             <Select value={role} onValueChange={(v) => setRole(v as MembershipRoleKey)}>

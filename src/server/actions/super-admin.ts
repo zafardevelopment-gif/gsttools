@@ -137,14 +137,27 @@ export async function updateTenantPlanAction(
 }
 
 /**
- * Create a brand-new auth.users account and assign it straight to a chosen
- * tenant — the platform-level equivalent of a tenant's own "create new
- * user" flow (see server/actions/users.ts createUserAction), for when
- * support/onboarding needs to hand a business its first login without the
- * owner doing it themselves.
+ * Create a brand-new auth.users account and assign it to a tenant — the
+ * platform-level equivalent of a tenant's own "create new user" flow (see
+ * server/actions/users.ts createUserAction), for when support/onboarding
+ * needs to hand a business its first login without the owner doing it
+ * themselves.
+ *
+ * Accepts either an existing tenantId, or newBusiness (name + GST state
+ * code) to spin up a brand-new business at the same time — useful because
+ * the Users page previously only let you assign into a tenant that already
+ * existed, which meant onboarding a genuinely new customer required first
+ * going to create the business some other way. This does the same three
+ * inserts (tenant, trial subscription, owner-of-nothing-yet membership)
+ * that the self-serve onboarding RPC (gst_create_tenant_with_owner) does,
+ * but via the service-role client instead of that RPC — the RPC keys off
+ * auth.uid() to decide who the owner is, which only works when the new
+ * tenant's own owner is the one calling it, not an admin acting on their
+ * behalf with no session for them yet.
  */
 export async function createPlatformUserAction(input: {
-  tenantId: string;
+  tenantId?: string;
+  newBusiness?: { name: string; stateCode: string };
   email: string;
   password: string;
   role: MembershipRoleKey;
@@ -158,14 +171,51 @@ export async function createPlatformUserAction(input: {
   if (input.password.length < 6) {
     return { error: "Password must be at least 6 characters." };
   }
+  if (!input.tenantId && !input.newBusiness) {
+    return { error: "Choose a business or enter a name for a new one." };
+  }
 
   const admin = createAdminClient();
-  const { data: tenant } = await admin
-    .from("aimunim_tenants")
-    .select("id")
-    .eq("id", input.tenantId)
-    .maybeSingle();
-  if (!tenant) return { error: "Tenant not found." };
+
+  let tenantId = input.tenantId;
+  if (!tenantId) {
+    const name = input.newBusiness!.name.trim();
+    const stateCode = input.newBusiness!.stateCode.trim();
+    if (!name) return { error: "Business name is required." };
+    if (!/^[0-9]{2}$/.test(stateCode)) return { error: "Choose a state." };
+
+    const { data: newTenant, error: tenantErr } = await admin
+      .from("aimunim_tenants")
+      .insert({ name, state_code: stateCode, plan: "trial" })
+      .select("id")
+      .single();
+    if (tenantErr || !newTenant) {
+      return { error: tenantErr?.message ?? "Could not create the business." };
+    }
+    tenantId = newTenant.id;
+
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + PLANS.trial.trialDays * 86400000);
+    const { error: subErr } = await admin.from("aimunim_subscriptions").insert({
+      tenant_id: tenantId,
+      plan: "trial",
+      status: "trialing",
+      trial_ends_at: trialEnd.toISOString(),
+      current_period_start: now.toISOString(),
+      current_period_end: trialEnd.toISOString(),
+    });
+    if (subErr) {
+      await admin.from("aimunim_tenants").delete().eq("id", tenantId);
+      return { error: subErr.message };
+    }
+  } else {
+    const { data: tenant } = await admin
+      .from("aimunim_tenants")
+      .select("id")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (!tenant) return { error: "Tenant not found." };
+  }
 
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: input.email,
@@ -182,7 +232,7 @@ export async function createPlatformUserAction(input: {
   }
 
   const { error: memberErr } = await admin.from("aimunim_memberships").insert({
-    tenant_id: input.tenantId,
+    tenant_id: tenantId,
     user_id: created.user.id,
     role: input.role,
   });
@@ -192,6 +242,7 @@ export async function createPlatformUserAction(input: {
   }
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin");
   return { ok: true };
 }
 
