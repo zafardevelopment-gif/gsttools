@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant";
 import { getDevRole, DEV_AUTH_COOKIE } from "@/lib/dev-session";
+import { realAuthEnabled } from "@/lib/env";
 
 // TEMPORARY dev credentials for the local email+password login (no OTP/email).
 // Two personas: a platform super admin and a normal tenant end user.
@@ -61,7 +62,12 @@ export async function signInAction(
     redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
   }
 
-  // Not a dev persona (or wrong password for one) — try a real account.
+  // Not a dev persona (or wrong password for one). Real accounts only get a
+  // chance to log in once realAuthEnabled is turned on — see lib/env.ts.
+  if (!realAuthEnabled) {
+    return { error: "Invalid email or password." };
+  }
+
   // createClient() returns the real RLS-scoped client here since no dev
   // cookie is set yet, and signInWithPassword sets the Supabase session
   // cookies on success via that client's cookie adapter.
@@ -92,12 +98,19 @@ export type SignUpState = { error?: string; checkEmail?: boolean };
  * browser into that session. No business/tenant exists yet at this point;
  * onboarding/page.tsx (via requireUser + getActiveContext) picks that up
  * next and walks them through creating one. Works independently of the
- * /login dev personas — see lib/dev-session.ts.
+ * /login dev personas — see lib/dev-session.ts. Gated behind realAuthEnabled
+ * (off by default) so public signup doesn't go live before it's wanted.
  */
 export async function signUpAction(
   _prev: SignUpState,
   formData: FormData,
 ): Promise<SignUpState> {
+  if (!realAuthEnabled) {
+    return {
+      error: "New signups aren't open yet — please check back soon.",
+    };
+  }
+
   const parsed = signUpSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),

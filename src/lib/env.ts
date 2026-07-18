@@ -34,6 +34,17 @@ export const isSupabaseConfigured = parsedPublic.success;
 
 export const authDisabled = process.env.NEXT_PUBLIC_AUTH_DISABLED === "true";
 
+/**
+ * Gates real Supabase signup/login (see server/actions/auth.ts). Off by
+ * default — only the two hardcoded dev/demo personas can log in until this
+ * is explicitly turned on (NEXT_PUBLIC_REAL_AUTH_ENABLED=true), so public
+ * signup doesn't quietly go live before it's wanted. Independent of
+ * authDisabled / lib/dev-session.ts, which is about which tenant a given
+ * request resolves to, not whether new real accounts can be created.
+ */
+export const realAuthEnabled =
+  process.env.NEXT_PUBLIC_REAL_AUTH_ENABLED === "true";
+
 export const DEMO_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 
 export const DEV_SUPERADMIN_EMAIL =
