@@ -17,6 +17,7 @@ import { formatINR } from "@/lib/money";
 import {
   STATE_CODE_TO_NAME,
   INVOICE_THEMES,
+  documentTitle,
   type InvoiceThemeKey,
   type PaperSizeKey,
 } from "@/lib/constants";
@@ -130,7 +131,7 @@ export function InvoicePdf({
             }}
           >
             <Text style={{ color: "#ffffff", fontSize: sheet.fontSize + 2, fontFamily: "Helvetica-Bold" }}>
-              {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
+              {documentTitle(invoice.voucher_type, invoice.direction).toUpperCase()}
             </Text>
           </View>
         ) : null}
@@ -156,7 +157,7 @@ export function InvoicePdf({
           <View style={{ alignItems: "flex-end" }}>
             {!theme.headerBand ? (
               <Text style={s.h2}>
-                {invoice.direction === "purchase" ? "PURCHASE BILL" : "TAX INVOICE"}
+                {documentTitle(invoice.voucher_type, invoice.direction).toUpperCase()}
               </Text>
             ) : null}
             <Text style={s.bold}>{invoice.invoice_number}</Text>

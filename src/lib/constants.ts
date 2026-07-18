@@ -175,6 +175,25 @@ export const VOUCHER_TYPES = {
 
 export type VoucherTypeKey = keyof typeof VOUCHER_TYPES;
 
+/**
+ * Title printed on the document itself (screen preview, PDF, WhatsApp/email
+ * share). Was previously hardcoded to always say "Tax Invoice" / "Purchase
+ * Bill" regardless of voucher_type, so a Quotation, Proforma, Delivery
+ * Challan, Credit/Debit Note etc. all incorrectly rendered as a "Tax
+ * Invoice" — misleading for a document type with a specific legal meaning
+ * under GST. "invoice" keeps the direction-based Tax Invoice / Purchase
+ * Bill wording; every other voucher type gets its own proper document name.
+ */
+export function documentTitle(
+  voucherType: VoucherTypeKey,
+  direction: "sale" | "purchase",
+): string {
+  if (voucherType === "invoice") {
+    return direction === "purchase" ? "Purchase Bill" : "Tax Invoice";
+  }
+  return VOUCHER_TYPES[voucherType]?.label ?? "Invoice";
+}
+
 /** Voucher types shown under the Sales section vs the Purchases section. */
 export const SALE_VOUCHER_TYPES: VoucherTypeKey[] = [
   "invoice",

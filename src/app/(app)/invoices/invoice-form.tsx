@@ -163,6 +163,11 @@ export function InvoiceForm({
       : [emptyLine()],
   );
 
+  // Which line's item-name field currently has its type-ahead suggestion
+  // list open (by line key). Typing in "Item name" now filters the catalog
+  // directly instead of requiring the separate "Pick item" dropdown.
+  const [openSuggestKey, setOpenSuggestKey] = useState<number | null>(null);
+
   const party = parties.find((p) => p.id === partyId);
   const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;
   const interstate = isInterstateSupply(businessStateCode, placeOfSupply);
@@ -381,22 +386,55 @@ export function InvoiceForm({
               key={l.key}
               className="grid grid-cols-2 gap-2 md:grid-cols-[1fr_5rem_6rem_4rem_5rem_7rem_2rem] md:items-center"
             >
-              <div className="col-span-2 md:col-span-1 space-y-1">
-                {items.length > 0 && (
-                  <Select value={l.itemId ?? ""} onValueChange={(v) => pickItem(l.key, v)}>
-                    <SelectTrigger className="h-8"><SelectValue placeholder="Pick item or type below" /></SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {items.map((i) => (
-                        <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <div className="relative col-span-2 md:col-span-1">
                 <Input
-                  placeholder="Item name"
+                  placeholder="Type to search items…"
                   value={l.name}
-                  onChange={(e) => updateLine(l.key, { name: e.target.value, itemId: null })}
+                  onChange={(e) => {
+                    updateLine(l.key, { name: e.target.value, itemId: null });
+                    setOpenSuggestKey(l.key);
+                  }}
+                  onFocus={() => setOpenSuggestKey(l.key)}
+                  onBlur={() => {
+                    // Delay so the click on a suggestion registers first.
+                    setTimeout(() => setOpenSuggestKey((k) => (k === l.key ? null : k)), 150);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setOpenSuggestKey(null);
+                  }}
+                  autoComplete="off"
                 />
+                {openSuggestKey === l.key && items.length > 0 && (() => {
+                  const q = l.name.trim().toLowerCase();
+                  const matches = (
+                    q
+                      ? items.filter((i) => i.name.toLowerCase().includes(q))
+                      : items
+                  ).slice(0, 8);
+                  if (matches.length === 0) return null;
+                  return (
+                    <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border bg-popover shadow-md">
+                      {matches.map((i) => (
+                        <button
+                          key={i.id}
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                          onMouseDown={(e) => {
+                            // mousedown (not click) so it fires before the input's onBlur.
+                            e.preventDefault();
+                            pickItem(l.key, i.id);
+                            setOpenSuggestKey(null);
+                          }}
+                        >
+                          <span>{i.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatINR(i.sale_price_paise)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
               <Input type="number" step="0.001" min="0" value={l.qty}
                 onChange={(e) => updateLine(l.key, { qty: e.target.value })} />

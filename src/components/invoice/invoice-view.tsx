@@ -1,5 +1,5 @@
 import { formatINR } from "@/lib/money";
-import { STATE_CODE_TO_NAME, INVOICE_THEMES, type InvoiceThemeKey } from "@/lib/constants";
+import { STATE_CODE_TO_NAME, INVOICE_THEMES, documentTitle, type InvoiceThemeKey } from "@/lib/constants";
 import type { FullInvoice } from "@/server/queries/invoices";
 
 export type ViewExtras = {
@@ -78,7 +78,7 @@ export function InvoiceView({
             className="inline-block rounded-md px-3 py-1 text-xs font-bold uppercase tracking-widest text-white"
             style={{ backgroundColor: theme.accent }}
           >
-            {invoice.direction === "purchase" ? "Purchase Bill" : "Tax Invoice"}
+            {documentTitle(invoice.voucher_type, invoice.direction)}
           </span>
           <p className="mt-2 text-base font-bold tabular-nums">{invoice.invoice_number}</p>
           <div className="mt-1 space-y-0.5 text-xs text-zinc-600">
