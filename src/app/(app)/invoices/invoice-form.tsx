@@ -168,6 +168,26 @@ export function InvoiceForm({
   // directly instead of requiring the separate "Pick item" dropdown.
   const [openSuggestKey, setOpenSuggestKey] = useState<number | null>(null);
 
+  // Customer/Supplier is a type-ahead field too (see Item field below for the
+  // same pattern) rather than a plain <Select>. The old Select version had a
+  // real, reproducible bug: with few/one parties in the list, its popover
+  // content aligns directly over the trigger, so a single click can open and
+  // "preview" a highlighted option without actually committing it — the
+  // trigger shows the party name, but the underlying partyId state never
+  // changed. Any later click elsewhere on the page (e.g. into the item
+  // field) then closes that never-committed popover and the display reverts
+  // to "Select party" — except it isn't just a display glitch: partyId was
+  // genuinely still "", so a save at that point silently produced an invoice
+  // billed to "Cash / walk-in" instead of the intended customer. Switching
+  // to the same search-as-you-type + explicit-click-to-select pattern used
+  // for items removes the ambiguous single-click-commit path entirely.
+  const [partyQuery, setPartyQuery] = useState(
+    initial?.partyId
+      ? (parties.find((p) => p.id === initial.partyId)?.name ?? "")
+      : "",
+  );
+  const [openPartySuggest, setOpenPartySuggest] = useState(false);
+
   const party = parties.find((p) => p.id === partyId);
   const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;
   const interstate = isInterstateSupply(businessStateCode, placeOfSupply);
@@ -188,6 +208,12 @@ export function InvoiceForm({
       }),
     [lines, interstate, invoiceType, additionalCharges, roundOff],
   );
+
+  function pickParty(p: PartyOption) {
+    setPartyId(p.id);
+    setPartyQuery(p.name);
+    setOpenPartySuggest(false);
+  }
 
   function updateLine(key: number, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -330,16 +356,65 @@ export function InvoiceForm({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+          <div className="relative space-y-1.5">
             <Label>{direction === "purchase" ? "Supplier" : "Customer"}</Label>
-            <Select value={partyId} onValueChange={setPartyId}>
-              <SelectTrigger><SelectValue placeholder="Select party" /></SelectTrigger>
-              <SelectContent>
-                {relevantParties.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              className="h-11 text-base"
+              placeholder={`Type to search ${direction === "purchase" ? "suppliers" : "customers"}…`}
+              value={partyQuery}
+              onChange={(e) => {
+                setPartyQuery(e.target.value);
+                setPartyId("");
+                setOpenPartySuggest(true);
+              }}
+              onFocus={() => setOpenPartySuggest(true)}
+              onBlur={() => {
+                // Delay so a click on a suggestion registers first.
+                setTimeout(() => setOpenPartySuggest(false), 150);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpenPartySuggest(false);
+              }}
+              autoComplete="off"
+            />
+            {openPartySuggest && (() => {
+              const q = partyQuery.trim().toLowerCase();
+              const matches = (
+                q
+                  ? relevantParties.filter((p) => p.name.toLowerCase().includes(q))
+                  : relevantParties
+              ).slice(0, 8);
+              if (matches.length === 0) {
+                return (
+                  <div className="absolute z-20 mt-1 w-full rounded-md border bg-popover px-3 py-2 text-sm text-muted-foreground shadow-md">
+                    {relevantParties.length === 0
+                      ? "No parties yet — add one from Parties."
+                      : "No match."}
+                  </div>
+                );
+              }
+              return (
+                <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-md border bg-popover shadow-md">
+                  {matches.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                      onMouseDown={(e) => {
+                        // mousedown (not click) so it fires before the input's onBlur.
+                        e.preventDefault();
+                        pickParty(p);
+                      }}
+                    >
+                      <span>{p.name}</span>
+                      {p.gstin && (
+                        <span className="text-xs text-muted-foreground">{p.gstin}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="space-y-1.5">
