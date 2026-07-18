@@ -34,12 +34,19 @@ export type SignInState = { error?: string };
  * Checks the hardcoded dev/demo personas first (no Supabase call — just sets
  * the dev-auth cookie). If the email doesn't match a dev persona, falls back
  * to real Supabase auth (signInWithPassword) — this is what lets accounts
- * created via signUpAction below actually log back in. Previously this
- * function ONLY checked the dev personas, so any real signed-up user always
- * got "Invalid email or password" here regardless of whether their account
- * existed. Designed for useActionState: returns { error } on failure, and
- * never throws on the happy path (the NEXT_REDIRECT control-flow signal is
- * re-thrown so Next can handle it).
+ * log back in, whether they came from public signUpAction below (gated
+ * behind realAuthEnabled) or from an owner/admin using "Create user" on
+ * their Manage Users page (server/actions/users.ts createUserAction) or the
+ * Super Admin Users page (createPlatformUserAction) — both of those create
+ * real accounts directly with no email confirmation step, regardless of
+ * realAuthEnabled, since they require already being logged in as
+ * owner/admin/super-admin. Login is NOT gated behind realAuthEnabled: that
+ * flag only controls whether the public /signup form can create new
+ * accounts, not whether an already-existing real account can log in — a
+ * user an admin just created needs to be able to log in immediately, even
+ * while public signup is still closed. Designed for useActionState: returns
+ * { error } on failure, and never throws on the happy path (the
+ * NEXT_REDIRECT control-flow signal is re-thrown so Next can handle it).
  */
 export async function signInAction(
   _prev: SignInState,
@@ -62,12 +69,7 @@ export async function signInAction(
     redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
   }
 
-  // Not a dev persona (or wrong password for one). Real accounts only get a
-  // chance to log in once realAuthEnabled is turned on — see lib/env.ts.
-  if (!realAuthEnabled) {
-    return { error: "Invalid email or password." };
-  }
-
+  // Not a dev persona (or wrong password for one) — try a real account.
   // createClient() returns the real RLS-scoped client here since no dev
   // cookie is set yet, and signInWithPassword sets the Supabase session
   // cookies on success via that client's cookie adapter.
