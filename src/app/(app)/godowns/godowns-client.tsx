@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -48,7 +49,7 @@ export function AddGodownDialog() {
       else {
         toast.success("Godown added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -113,7 +114,7 @@ export function TransferStockDialog({
       else {
         toast.success("Stock transferred.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -214,7 +215,7 @@ export function AssignStockDialog({
       else {
         toast.success("Stock assigned to godown.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export function CreateUserDialog({
       else {
         toast.success("Account created and assigned.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

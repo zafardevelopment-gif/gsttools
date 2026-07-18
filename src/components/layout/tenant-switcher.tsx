@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { Check, ChevronsUpDown, Building2 } from "lucide-react";
@@ -31,7 +32,7 @@ export function TenantSwitcher({
     startTransition(async () => {
       try {
         await setActiveTenantAction(id);
-        router.refresh();
+        refreshWithRetry(router);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Could not switch.");
       }

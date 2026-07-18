@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -33,7 +34,7 @@ export function SettingsForm({ tenant }: { tenant: TenantRow }) {
       if (res.error) toast.error(res.error);
       else {
         toast.success("Business details saved.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -62,7 +63,7 @@ export function PartyFormDialog({
       } else {
         toast.success(isEdit ? "Party updated." : "Party created.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -219,7 +220,8 @@ export function PartyFormDialog({
                 type="number"
                 min="0"
                 step="1"
-                defaultValue={party?.credit_period_days ?? "0"}
+                placeholder="0"
+                defaultValue={party?.credit_period_days ?? ""}
               />
             </div>
             <div className="space-y-1.5">
@@ -230,10 +232,11 @@ export function PartyFormDialog({
                 type="number"
                 min="0"
                 step="0.01"
+                placeholder="0"
                 defaultValue={
                   party && party.credit_limit_paise > 0
                     ? paiseToRupees(party.credit_limit_paise)
-                    : "0"
+                    : ""
                 }
               />
             </div>
@@ -248,7 +251,8 @@ export function PartyFormDialog({
               name="opening_balance"
               type="number"
               step="0.01"
-              defaultValue={party ? paiseToRupees(party.opening_balance_paise) : "0"}
+              placeholder="0"
+              defaultValue={party ? paiseToRupees(party.opening_balance_paise) : ""}
             />
           </div>
 

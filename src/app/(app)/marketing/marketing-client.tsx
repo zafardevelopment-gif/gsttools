@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -50,7 +51,7 @@ export function NewCampaignDialog() {
       else {
         toast.success("Campaign saved as draft.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -135,7 +136,7 @@ export function CampaignList({ campaigns }: { campaigns: CampaignRow[] }) {
       const res = await sendCampaignAction(id);
       if (res.error) toast.error(res.error);
       else toast.success(`Campaign sent to ${res.sent ?? 0} parties.`);
-      router.refresh();
+      refreshWithRetry(router);
     });
   }
 

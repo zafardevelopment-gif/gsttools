@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -57,7 +58,7 @@ export function InvoiceSettingsForm({
       if (res.error) toast.error(res.error);
       else {
         toast.success("Invoice settings saved.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -67,7 +68,7 @@ export function InvoiceSettingsForm({
     startTransition(async () => {
       const res = await updateCustomUnitsAction(next);
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 

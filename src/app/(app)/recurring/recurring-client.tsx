@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -78,7 +79,7 @@ export function NewRecurringDialog({
         toast.success("Automated bill created.");
         setOpen(false);
         setLines([{ key: seq++, itemId: "", qty: "1" }]);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -220,7 +221,7 @@ export function RecurringList({
     startTransition(async () => {
       const res = await toggleRecurringAction({ id, isActive });
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 
@@ -228,7 +229,7 @@ export function RecurringList({
     startTransition(async () => {
       const res = await deleteRecurringAction(id);
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 

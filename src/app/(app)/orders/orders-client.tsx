@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -41,7 +42,7 @@ export function OrdersTable({ orders }: { orders: OnlineOrderRow[] }) {
     startTransition(async () => {
       const res = await updateOrderStatusAction({ orderId: id, status });
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 

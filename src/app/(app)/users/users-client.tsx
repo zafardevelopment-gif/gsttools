@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -71,7 +72,7 @@ export function InviteUserDialog() {
       else {
         toast.success("Member added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -89,7 +90,7 @@ export function InviteUserDialog() {
       else {
         toast.success("Account created and added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -203,7 +204,7 @@ export function MembersTable({ members }: { members: MemberRow[] }) {
     startTransition(async () => {
       const res = await changeRoleAction({ membershipId, role });
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 
@@ -213,7 +214,7 @@ export function MembersTable({ members }: { members: MemberRow[] }) {
       if (res.error) toast.error(res.error);
       else {
         toast.success("Member removed.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

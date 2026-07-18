@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -65,7 +66,7 @@ export function AddStaffDialog() {
       else {
         toast.success("Staff member added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -105,15 +106,15 @@ export function AddStaffDialog() {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="st_basic">Basic (₹/mo)</Label>
-              <Input id="st_basic" name="basic" type="number" step="1" min="0" defaultValue="0" />
+              <Input id="st_basic" name="basic" type="number" step="1" min="0" placeholder="0" defaultValue="" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="st_hra">HRA (₹/mo)</Label>
-              <Input id="st_hra" name="hra" type="number" step="1" min="0" defaultValue="0" />
+              <Input id="st_hra" name="hra" type="number" step="1" min="0" placeholder="0" defaultValue="" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="st_conv">Conveyance</Label>
-              <Input id="st_conv" name="conveyance" type="number" step="1" min="0" defaultValue="0" />
+              <Input id="st_conv" name="conveyance" type="number" step="1" min="0" placeholder="0" defaultValue="" />
             </div>
           </div>
           <DialogFooter>
@@ -140,7 +141,7 @@ function AttendanceButtons({ staff }: { staff: StaffListRow }) {
         overtimeHours: status === "overtime" ? 2 : 0,
       });
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 
@@ -187,7 +188,7 @@ function StaffActions({ staff }: { staff: StaffListRow }) {
       else {
         toast.success("Entry recorded.");
         setLedgerOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -198,7 +199,7 @@ function StaffActions({ staff }: { staff: StaffListRow }) {
       if (res.error) toast.error(res.error);
       else {
         toast.success("Payslip generated for this month.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

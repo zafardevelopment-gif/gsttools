@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -74,7 +75,7 @@ function BrandingUpload({
       if (res.error) toast.error(res.error);
       else {
         toast.success(`${label} upload ho gaya.`);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -150,7 +151,7 @@ export function BusinessExtrasForm({
       if (res.error) toast.error(res.error);
       else {
         toast.success("Business details saved.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

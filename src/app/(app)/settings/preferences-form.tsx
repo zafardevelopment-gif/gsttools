@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -60,7 +61,7 @@ export function PreferencesForm({
       if (res.error) toast.error(res.error);
       else {
         toast.success("Preferences saved.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

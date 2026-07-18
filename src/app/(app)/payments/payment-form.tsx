@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -121,7 +122,7 @@ export function PaymentForm({
       else {
         toast.success("Payment recorded.");
         router.push(prefill?.invoiceId ? `/invoices/${prefill.invoiceId}` : "/payments");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

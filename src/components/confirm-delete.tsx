@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -42,7 +43,7 @@ export function ConfirmDelete({
       } else {
         toast.success("Deleted.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

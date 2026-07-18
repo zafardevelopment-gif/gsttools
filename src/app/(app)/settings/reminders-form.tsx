@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -39,7 +40,7 @@ export function RemindersForm({
     startTransition(async () => {
       const res = await updateInvoiceSettingsAction(patch);
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 
@@ -51,7 +52,7 @@ export function RemindersForm({
       if (res.error) toast.error(res.error);
       else {
         toast.success("Reminder rule added.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -60,7 +61,7 @@ export function RemindersForm({
     startTransition(async () => {
       const res = await toggleReminderRuleAction({ id, enabled });
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 
@@ -68,7 +69,7 @@ export function RemindersForm({
     startTransition(async () => {
       const res = await deleteReminderRuleAction(id);
       if (res.error) toast.error(res.error);
-      else router.refresh();
+      else refreshWithRetry(router);
     });
   }
 

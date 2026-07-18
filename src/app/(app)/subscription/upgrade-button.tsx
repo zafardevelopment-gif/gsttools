@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -33,7 +34,7 @@ export function UpgradeButton({
       if (res.error) toast.error(res.error);
       else {
         toast.success("Plan updated.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

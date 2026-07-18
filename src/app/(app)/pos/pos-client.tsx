@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -255,7 +256,7 @@ export function PosClient({
       if (print && res.id) {
         window.open(`/invoices/${res.id}/pdf`, "_blank");
       }
-      router.refresh();
+      refreshWithRetry(router);
     });
   }
 

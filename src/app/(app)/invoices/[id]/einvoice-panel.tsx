@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,7 +36,7 @@ export function EInvoicePanel({
       if (res.error) toast.error(res.error);
       else {
         toast.success("e-Invoice (IRN) generated.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -46,7 +47,7 @@ export function EInvoicePanel({
       if (res.error) toast.error(res.error);
       else {
         toast.success("e-Way bill generated.");
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

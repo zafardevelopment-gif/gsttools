@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -62,7 +63,7 @@ export function ItemFormDialog({
       } else {
         toast.success(isEdit ? "Item updated." : "Item created.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -264,7 +265,8 @@ export function ItemFormDialog({
                     type="number"
                     step="0.001"
                     min="0"
-                    defaultValue="0"
+                    placeholder="0"
+                    defaultValue=""
                   />
                 </div>
               )}
@@ -276,7 +278,8 @@ export function ItemFormDialog({
                   type="number"
                   step="0.001"
                   min="0"
-                  defaultValue={item ? item.low_stock_level : "0"}
+                  placeholder="0"
+                  defaultValue={item ? item.low_stock_level : ""}
                 />
               </div>
               {isEdit && (

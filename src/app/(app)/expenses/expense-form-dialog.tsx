@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -44,7 +45,7 @@ export function ExpenseFormDialog() {
       else {
         toast.success("Expense added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }

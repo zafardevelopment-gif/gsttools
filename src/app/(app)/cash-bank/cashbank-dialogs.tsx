@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -53,7 +54,7 @@ export function AddBankAccountDialog() {
       else {
         toast.success("Bank account added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -91,7 +92,8 @@ export function AddBankAccountDialog() {
               name="opening_balance"
               type="number"
               step="0.01"
-              defaultValue="0"
+              placeholder="0"
+              defaultValue=""
             />
           </div>
           <DialogFooter>
@@ -127,7 +129,7 @@ export function AdjustMoneyDialog({ accounts }: { accounts: AccountOption[] }) {
       else {
         toast.success("Entry added.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
@@ -215,7 +217,7 @@ export function TransferMoneyDialog({ accounts }: { accounts: AccountOption[] })
       else {
         toast.success("Transfer recorded.");
         setOpen(false);
-        router.refresh();
+        refreshWithRetry(router);
       }
     });
   }
