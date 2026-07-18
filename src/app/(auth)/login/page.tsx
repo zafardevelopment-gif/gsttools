@@ -2,7 +2,7 @@
 
 import { Suspense, useActionState } from "react";
 import Link from "next/link";
-import { devSignIn, type DevSignInState } from "@/server/actions/auth";
+import { signInAction, type SignInState } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +27,8 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
-  const [state, formAction, pending] = useActionState<DevSignInState, FormData>(
-    devSignIn,
+  const [state, formAction, pending] = useActionState<SignInState, FormData>(
+    signInAction,
     {},
   );
 
@@ -47,7 +47,7 @@ function LoginForm() {
               name="email"
               type="email"
               autoComplete="username"
-              placeholder="user@aimunim.local"
+              placeholder="you@business.com"
               required
               disabled={pending}
             />

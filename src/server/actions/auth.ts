@@ -25,38 +25,53 @@ const DEV_CREDENTIALS: Record<
   },
 };
 
-export type DevSignInState = { error?: string };
+export type SignInState = { error?: string };
 
 /**
- * Local email+password sign-in for the hardcoded dev/demo personas.
- * No Supabase Auth / email — just checks the configured credentials, sets the
- * dev-auth cookie, and redirects to /dashboard. Designed for useActionState:
- * returns { error } on failure, and never throws on the happy path (the
- * NEXT_REDIRECT control-flow signal is re-thrown so Next can handle it).
+ * Email+password sign-in for the /login form.
+ *
+ * Checks the hardcoded dev/demo personas first (no Supabase call — just sets
+ * the dev-auth cookie). If the email doesn't match a dev persona, falls back
+ * to real Supabase auth (signInWithPassword) — this is what lets accounts
+ * created via signUpAction below actually log back in. Previously this
+ * function ONLY checked the dev personas, so any real signed-up user always
+ * got "Invalid email or password" here regardless of whether their account
+ * existed. Designed for useActionState: returns { error } on failure, and
+ * never throws on the happy path (the NEXT_REDIRECT control-flow signal is
+ * re-thrown so Next can handle it).
  */
-export async function devSignIn(
-  _prev: DevSignInState,
+export async function signInAction(
+  _prev: SignInState,
   formData: FormData,
-): Promise<DevSignInState> {
+): Promise<SignInState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   const cred = DEV_CREDENTIALS[email.toLowerCase()];
-  if (!cred || password !== cred.password) {
+  if (cred && password === cred.password) {
+    const cookieStore = await cookies();
+    cookieStore.set(DEV_AUTH_COOKIE, cred.role, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+    // Superadmin lands on the platform panel, end users on their dashboard.
+    redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
+  }
+
+  // Not a dev persona (or wrong password for one) — try a real account.
+  // createClient() returns the real RLS-scoped client here since no dev
+  // cookie is set yet, and signInWithPassword sets the Supabase session
+  // cookies on success via that client's cookie adapter.
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
     return { error: "Invalid email or password." };
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set(DEV_AUTH_COOKIE, cred.role, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-  });
-
-  // Superadmin lands on the platform panel, end users on their dashboard.
-  redirect(cred.role === "superadmin" ? "/admin" : "/dashboard");
+  redirect("/dashboard");
 }
 
 const signUpSchema = z

@@ -2,8 +2,8 @@ import "server-only";
 import { cookies } from "next/headers";
 
 /**
- * Cookie set by the dev email+password login (see server/actions/auth.ts ->
- * devSignIn). Its presence — not the global NEXT_PUBLIC_AUTH_DISABLED flag —
+ * Cookie set by the dev/demo persona login (see server/actions/auth.ts ->
+ * signInAction). Its presence — not the global NEXT_PUBLIC_AUTH_DISABLED flag —
  * is what decides whether a given request uses the demo-tenant dev bypass or
  * real Supabase auth. This lets both coexist on the same deployment: testers
  * who log in with the dev personas keep working exactly as before, while

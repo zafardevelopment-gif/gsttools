@@ -2,7 +2,7 @@
  * Server-side auth + tenant helpers used by pages, layouts and actions.
  *
  * Dev-persona login: visiting /login and signing in as one of the hardcoded
- * personas (see server/actions/auth.ts -> devSignIn) sets the DEV_AUTH_COOKIE
+ * personas (see server/actions/auth.ts -> signInAction) sets the DEV_AUTH_COOKIE
  * and every request carrying it resolves to the seeded demo tenant, bypassing
  * Supabase auth entirely. Requests WITHOUT that cookie always use real
  * Supabase auth + RLS, regardless of NEXT_PUBLIC_AUTH_DISABLED — see
