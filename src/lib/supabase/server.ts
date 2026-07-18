@@ -14,13 +14,16 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
-import { publicEnv, getServerEnv, authDisabled } from "@/lib/env";
+import { publicEnv, getServerEnv } from "@/lib/env";
+import { getDevRole } from "@/lib/dev-session";
 
 export async function createClient() {
-  // Dev mode (NEXT_PUBLIC_AUTH_DISABLED): there is no Supabase auth session, so
-  // the RLS (anon) client would return nothing. Use the service-role client so
-  // the app reads/writes the seeded demo tenant. Remove once real auth exists.
-  if (authDisabled) return createAdminClient();
+  // Dev-persona login (gst_dev_auth cookie present): there is no Supabase auth
+  // session, so the RLS (anon) client would return nothing. Use the
+  // service-role client so the app reads/writes the seeded demo tenant.
+  // Requests without the cookie (i.e. real signed-up users) fall through to
+  // the real RLS-scoped client below, regardless of NEXT_PUBLIC_AUTH_DISABLED.
+  if (await getDevRole()) return createAdminClient();
 
   const cookieStore = await cookies();
 

@@ -5,8 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "@/lib/tenant";
-import { authDisabled } from "@/lib/env";
-import { DEV_AUTH_COOKIE } from "@/lib/auth";
+import { getDevRole, DEV_AUTH_COOKIE } from "@/lib/dev-session";
 
 // TEMPORARY dev credentials for the local email+password login (no OTP/email).
 // Two personas: a platform super admin and a normal tenant end user.
@@ -29,7 +28,7 @@ const DEV_CREDENTIALS: Record<
 export type DevSignInState = { error?: string };
 
 /**
- * Local email+password sign-in for dev mode (NEXT_PUBLIC_AUTH_DISABLED=true).
+ * Local email+password sign-in for the hardcoded dev/demo personas.
  * No Supabase Auth / email — just checks the configured credentials, sets the
  * dev-auth cookie, and redirects to /dashboard. Designed for useActionState:
  * returns { error } on failure, and never throws on the happy path (the
@@ -71,23 +70,19 @@ const signUpSchema = z
     path: ["confirmPassword"],
   });
 
-export type SignUpState = { error?: string };
+export type SignUpState = { error?: string; checkEmail?: boolean };
 
 /**
  * Public signup — creates a real Supabase auth.users account and signs the
  * browser into that session. No business/tenant exists yet at this point;
  * onboarding/page.tsx (via requireUser + getActiveContext) picks that up
- * next and walks them through creating one. Disabled in dev-auth-bypass
- * mode, where /login's hardcoded personas are the only way in.
+ * next and walks them through creating one. Works independently of the
+ * /login dev personas — see lib/dev-session.ts.
  */
 export async function signUpAction(
   _prev: SignUpState,
   formData: FormData,
 ): Promise<SignUpState> {
-  if (authDisabled) {
-    return { error: "Signup is disabled in dev mode. Use the dev login instead." };
-  }
-
   const parsed = signUpSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -99,7 +94,7 @@ export async function signUpAction(
   const { email, password } = parsed.data;
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) {
     return {
       error: error.message.toLowerCase().includes("already registered")
@@ -108,13 +103,22 @@ export async function signUpAction(
     };
   }
 
+  // If the Supabase project has "Confirm email" turned on, signUp() creates
+  // the auth.users row but returns no session — the browser isn't actually
+  // logged in yet. Redirecting to /onboarding in that case would immediately
+  // bounce back to /login (requireUser finds no session), which looks like
+  // signup silently failed. Show a "check your inbox" message instead.
+  if (!data.session) {
+    return { checkEmail: true };
+  }
+
   redirect("/onboarding");
 }
 
 /** Sign the user out and return to the login page. */
 export async function signOutAction() {
   const cookieStore = await cookies();
-  if (authDisabled) {
+  if (await getDevRole()) {
     cookieStore.delete(DEV_AUTH_COOKIE);
     cookieStore.delete(ACTIVE_TENANT_COOKIE);
     redirect("/login");
@@ -130,8 +134,8 @@ export async function signOutAction() {
  * trusting the requested tenant id, then sets the cookie.
  */
 export async function setActiveTenantAction(tenantId: string) {
-  // Dev mode has a single demo tenant; nothing to switch.
-  if (authDisabled) return;
+  // Dev-persona login has a single demo tenant; nothing to switch.
+  if (await getDevRole()) return;
   const supabase = await createClient();
   const {
     data: { user },

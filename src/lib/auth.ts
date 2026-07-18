@@ -1,28 +1,25 @@
 /**
  * Server-side auth + tenant helpers used by pages, layouts and actions.
  *
- * TEMPORARY dev mode: when NEXT_PUBLIC_AUTH_DISABLED=true the app uses a simple
- * local email+password login (see server/actions/auth.ts -> devSignIn) instead
- * of Supabase OTP. A signed-in dev session is just the DEV_AUTH_COOKIE cookie,
- * and every request resolves to the seeded demo tenant. Remove this whole block
- * once real auth is implemented.
+ * Dev-persona login: visiting /login and signing in as one of the hardcoded
+ * personas (see server/actions/auth.ts -> devSignIn) sets the DEV_AUTH_COOKIE
+ * and every request carrying it resolves to the seeded demo tenant, bypassing
+ * Supabase auth entirely. Requests WITHOUT that cookie always use real
+ * Supabase auth + RLS, regardless of NEXT_PUBLIC_AUTH_DISABLED — see
+ * lib/dev-session.ts for why the cookie (not the global flag) is the signal.
+ * This lets real signups and the dev personas coexist on one deployment.
  */
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { canAccessRoute } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveContext, ACTIVE_TENANT_COOKIE } from "@/lib/tenant";
-import {
-  authDisabled,
-  DEMO_TENANT_ID,
-  DEV_SUPERADMIN_EMAIL,
-  DEV_USER_EMAIL,
-} from "@/lib/env";
+import { DEMO_TENANT_ID, DEV_SUPERADMIN_EMAIL, DEV_USER_EMAIL } from "@/lib/env";
+import { getDevRole, DEV_AUTH_COOKIE, type DevRole } from "@/lib/dev-session";
 import { isSuperAdmin } from "@/lib/admin";
 import type { User } from "@supabase/supabase-js";
 
-/** Name of the cookie that marks a logged-in dev session. */
-export const DEV_AUTH_COOKIE = "gst_dev_auth";
+export { DEV_AUTH_COOKIE };
 
 // Two dev personas: a platform-level super admin and a normal tenant end user.
 // The cookie stores which one is signed in ("superadmin" | "user").
@@ -30,7 +27,7 @@ export const DEV_AUTH_COOKIE = "gst_dev_auth";
 // comment there for why admin.ts reads them from env.ts instead of here.)
 export { DEV_SUPERADMIN_EMAIL, DEV_USER_EMAIL };
 
-export type DevRole = "superadmin" | "user";
+export type { DevRole };
 
 // In dev mode there is no real auth.users row. id is null so created_by inserts
 // NULL (the column is nullable) instead of violating the FK to auth.users.
@@ -41,22 +38,10 @@ function devUser(role: DevRole): User {
   } as unknown as User;
 }
 
-/** The signed-in dev persona, or null when the cookie is absent/invalid. */
-async function getDevRole(): Promise<DevRole | null> {
-  const store = await cookies();
-  const v = store.get(DEV_AUTH_COOKIE)?.value;
-  // "1" is the legacy cookie value from before roles existed; treat as end user.
-  if (v === "superadmin") return "superadmin";
-  if (v === "user" || v === "1") return "user";
-  return null;
-}
-
 /** Returns the current user or null. */
 export async function getUser(): Promise<User | null> {
-  if (authDisabled) {
-    const role = await getDevRole();
-    return role ? devUser(role) : null;
-  }
+  const role = await getDevRole();
+  if (role) return devUser(role);
   const supabase = await createClient();
   const {
     data: { user },
@@ -66,11 +51,8 @@ export async function getUser(): Promise<User | null> {
 
 /** Redirects to /login if not authenticated; returns the user otherwise. */
 export async function requireUser(): Promise<User> {
-  if (authDisabled) {
-    const role = await getDevRole();
-    if (!role) redirect("/login");
-    return devUser(role);
-  }
+  const role = await getDevRole();
+  if (role) return devUser(role);
   const user = await getUser();
   if (!user) redirect("/login");
   return user;
@@ -86,9 +68,9 @@ export async function requireUser(): Promise<User> {
  * instead of silently landing on some tenant's dashboard as if they own it.
  */
 export async function requireTenant() {
-  if (authDisabled) {
-    const role = await getDevRole();
-    if (!role) redirect("/login");
+  const devRole = await getDevRole();
+  if (devRole) {
+    const role = devRole;
 
     if (role === "superadmin") {
       const cookieStore = await cookies();

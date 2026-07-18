@@ -2,7 +2,7 @@ import "server-only";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth";
 import { isSuperAdmin } from "@/lib/admin";
-import { authDisabled } from "@/lib/env";
+import { getDevRole } from "@/lib/dev-session";
 import type { TenantRow } from "@/lib/database.types";
 
 export type AppContext = {
@@ -31,9 +31,9 @@ export async function getAppContext(): Promise<AppContext> {
   const { user, userId, tenantId, role } = await requireTenant();
   const superAdmin = isSuperAdmin(user.email);
 
-  // Dev mode: no Supabase auth session, so RLS would return nothing. Load the
-  // demo tenant directly with the service client so the shell has a tenant.
-  if (authDisabled) {
+  // Dev-persona login: no Supabase auth session, so RLS would return nothing.
+  // Load the demo tenant directly with the service client so the shell has one.
+  if (await getDevRole()) {
     const svc = createAdminClient();
     const { data: tenant } = await svc
       .from("aimunim_tenants")

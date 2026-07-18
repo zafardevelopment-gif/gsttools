@@ -32,6 +32,25 @@ function SignUpForm() {
     {},
   );
 
+  if (state?.checkEmail) {
+    return (
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>Check your email</CardTitle>
+          <CardDescription>
+            We&apos;ve sent a confirmation link to your inbox. Click it to activate
+            your account, then log in to finish setting up your business.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link href="/login">
+            <Button className="w-full">Go to login</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>

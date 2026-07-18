@@ -11,7 +11,8 @@
  */
 import { cookies } from "next/headers";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { authDisabled, DEMO_TENANT_ID } from "@/lib/env";
+import { DEMO_TENANT_ID } from "@/lib/env";
+import { getDevRole } from "@/lib/dev-session";
 import { isSuperAdmin } from "@/lib/admin";
 
 export const ACTIVE_TENANT_COOKIE = "gst_active_tenant";
@@ -27,8 +28,8 @@ export type ActiveContext = {
  * user is not authenticated or has no membership.
  */
 export async function getActiveContext(): Promise<ActiveContext | null> {
-  // Dev mode: skip the auth/membership lookup and operate on the demo tenant.
-  if (authDisabled) {
+  // Dev-persona login: skip the auth/membership lookup and operate on the demo tenant.
+  if (await getDevRole()) {
     return {
       userId: null as unknown as string,
       tenantId: DEMO_TENANT_ID,

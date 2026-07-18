@@ -2,6 +2,11 @@
 
 > ⚠️ Ye credentials sirf local testing ke liye hain (`NEXT_PUBLIC_AUTH_DISABLED=true`).
 > Real auth on karne se pehle ye file delete kar dena aur passwords rotate kar dena.
+>
+> Note: dev-mode ab per-request `gst_dev_auth` cookie se decide hota hai
+> (lib/dev-session.ts), na ki is global env flag se — isliye `/signup` se real
+> Supabase signup ab is flag ki value se independent hamesha kaam karta hai.
+> Ye flag sirf in dono hardcoded personas ke liye relevant hai.
 
 | Role | Email | Password | Kahan jayega |
 |---|---|---|---|
