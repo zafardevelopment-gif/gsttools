@@ -31,6 +31,15 @@ export type DashboardStats = {
   }[];
 };
 
+/**
+ * Every query here filters `voucher_type = "invoice"` on top of
+ * `direction = "sale"` — without it, Quotations/Proformas/Delivery
+ * Challans (which share the same invoices table and "sale" direction but
+ * aren't real sales) get counted as revenue and listed as recent invoices.
+ * Found this inflating Today's/This month's sales after creating a test
+ * quotation. See also invoiceReport() below and getPartyLedger() in
+ * queries/payments.ts, which had the same gap.
+ */
 export async function getDashboardStats(): Promise<DashboardStats> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
@@ -50,6 +59,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .select("invoice_date, total_paise")
       .eq("tenant_id", tenantId)
       .eq("direction", "sale")
+      .eq("voucher_type", "invoice")
       .neq("status", "draft")
       .gte("invoice_date", from)
       .lte("invoice_date", to),
@@ -76,6 +86,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .select("id, invoice_number, invoice_date, total_paise, status")
       .eq("tenant_id", tenantId)
       .eq("direction", "sale")
+      .eq("voucher_type", "invoice")
       .order("created_at", { ascending: false })
       .limit(5),
   ]);
@@ -131,11 +142,19 @@ async function invoiceReport(
 ): Promise<ReportResult> {
   const { tenantId } = await requireActiveContext();
   const supabase = await createClient();
+  // voucher_type = "invoice" only — this simple report has no sign-flipping
+  // logic for returns/credit/debit notes (unlike gstr1Report) and, more
+  // importantly, was previously including Quotations/Proformas/Challans
+  // (and Purchase Orders on the purchase side) as if they were real sales/
+  // purchases, since they also carry direction="sale"/"purchase". Confirmed
+  // this double-counted a quotation's amount once as itself and again once
+  // it was converted to a real invoice.
   const { data: invoices } = await supabase
     .from("aimunim_invoices")
     .select("invoice_number, invoice_date, party_id, taxable_value_paise, total_tax_paise, total_paise, status")
     .eq("tenant_id", tenantId)
     .eq("direction", direction)
+    .eq("voucher_type", "invoice")
     .neq("status", "draft")
     .gte("invoice_date", from)
     .lte("invoice_date", to)

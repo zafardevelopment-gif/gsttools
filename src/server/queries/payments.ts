@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
+import { VOUCHER_TYPES, type VoucherTypeKey } from "@/lib/constants";
 import type { PaymentRow, InvoiceRow, PartyRow } from "@/lib/database.types";
 
 export type PaymentListRow = PaymentRow & {
@@ -92,7 +93,7 @@ export async function getPartyLedger(partyId: string): Promise<{
   const [{ data: invoices }, { data: payments }] = await Promise.all([
     supabase
       .from("aimunim_invoices")
-      .select("id, invoice_number, invoice_date, direction, total_paise, status")
+      .select("id, invoice_number, invoice_date, direction, voucher_type, total_paise, status")
       .eq("tenant_id", tenantId)
       .eq("party_id", partyId)
       .neq("status", "draft"),
@@ -105,11 +106,23 @@ export async function getPartyLedger(partyId: string): Promise<{
 
   const entries: LedgerEntry[] = [];
   for (const inv of invoices ?? []) {
+    // Quotations, Proformas, Delivery Challans and Purchase Orders don't
+    // touch the party's balance (VOUCHER_TYPES[...].ledger === 0) — they
+    // used to be listed here as a phantom debit/credit anyway, which
+    // double-counted against the (correctly computed) balance shown in the
+    // summary card above and made the running total drift from it. Skip
+    // them; only actual ledger-affecting vouchers belong in this statement.
+    const vt = VOUCHER_TYPES[inv.voucher_type as VoucherTypeKey] ?? VOUCHER_TYPES.invoice;
+    if (vt.ledger === 0) continue;
+    const label =
+      inv.voucher_type === "invoice"
+        ? inv.direction === "sale" ? "Invoice" : "Purchase"
+        : vt.shortLabel;
     entries.push({
       id: inv.id,
       date: inv.invoice_date,
       kind: "invoice",
-      label: `${inv.direction === "sale" ? "Invoice" : "Purchase"} ${inv.invoice_number}`,
+      label: `${label} ${inv.invoice_number}`,
       debitPaise: inv.direction === "sale" ? inv.total_paise : 0,
       creditPaise: inv.direction === "purchase" ? inv.total_paise : 0,
     });
