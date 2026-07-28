@@ -1,0 +1,72 @@
+{
+  "name": "AI Munim — Owner ka daily summary",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Roz 9 baje",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 21 * * *" }]
+        }
+      },
+      "notes": "Apna timezone n8n Settings me set karein, warna ye UTC me chalega."
+    },
+    {
+      "id": "n2",
+      "name": "Aaj ka summary lein",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.AI_MUNIM_URL }}/api/internal",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'today_summary', tenant_id: $vars.AIMUNIM_TENANT_ID }) }}",
+        "options": {
+          "response": { "response": { "neverError": true, "fullResponse": true } }
+        }
+      },
+      "notes": "NOTE: /api/internal purana endpoint hai aur usme tenant_id body me jaata hai. Jab read endpoints /api/v1 me aa jayein, is node ko wahan shift karna hai — tab Header Auth wali per-tenant key hi tenant tay karegi."
+    },
+    {
+      "id": "n3",
+      "name": "Message banayein",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\n\nif (res.statusCode !== 200) {\n  throw new Error(`Summary fetch failed: ${res.statusCode} ${JSON.stringify(res.body)}`);\n}\n\nconst s = res.body;\nconst rs = (paise) => '₹' + ((paise ?? 0) / 100).toLocaleString('en-IN');\n\n// Chapter 9 ka insight: jo system dikhta nahi, uske paise dene ka mann nahi\n// karta. Isliye ye message chhota aur roz aana chahiye.\nconst lines = [\n  `Aaj ka hisaab (${s.date ?? new Date().toISOString().slice(0, 10)}):`,\n  ``,\n  `Sales: ${rs(s.sales)}  ·  ${s.bills ?? 0} bill`,\n  `Cash: ${rs(s.received_by_mode?.cash)}   UPI: ${rs(s.received_by_mode?.upi)}`,\n  `Udhaar diya: ${rs(s.credit_given)}`,\n  `Kharcha: ${rs(s.expenses)}`,\n];\n\nreturn [{ json: { text: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Owner ko WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $vars.WA_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: '91' + $vars.OWNER_PHONE, type: 'text', text: { body: $json.text } }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Roz 9 baje": { "main": [[{ "node": "Aaj ka summary lein", "type": "main", "index": 0 }]] },
+    "Aaj ka summary lein": { "main": [[{ "node": "Message banayein", "type": "main", "index": 0 }]] },
+    "Message banayein": { "main": [[{ "node": "Owner ko WhatsApp", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

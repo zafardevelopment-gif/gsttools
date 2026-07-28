@@ -1,0 +1,405 @@
+openapi: 3.1.0
+
+info:
+  title: AI Munim Automation API
+  version: "1.0.0"
+  description: |
+    Push data into AI Munim from an automation workflow (n8n, Make, a script).
+
+    Two rules matter more than anything else here:
+
+    1. **The tenant comes from the API key, never from the body.** There is no
+       `tenant_id` field anywhere in this spec. A key belongs to exactly one
+       business; sending a tenant id is an error.
+    2. **`Idempotency-Key` is mandatory on every write.** n8n retries on any
+       network blip, and a retried "create invoice" that creates a second
+       invoice would corrupt the GST number series. Send the same key on a
+       retry and you get the original response back, with no new record.
+
+    Invoices created here are indistinguishable from ones typed into the UI:
+    same numbering RPC, same GST maths, same stock movements, same ledger.
+
+servers:
+  - url: https://aimunim.aivexallp.com
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Ingest
+    description: Push records into AI Munim.
+
+paths:
+  /api/v1/ingest/invoice:
+    post:
+      tags: [Ingest]
+      summary: Create an invoice
+      operationId: ingestInvoice
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceInput"
+            examples:
+              cashSale:
+                summary: Counter sale, no customer record
+                value:
+                  invoiceDate: "2026-07-28"
+                  lines:
+                    - name: "Aata 10kg"
+                      qty: 2
+                      rate: 450
+                      taxRate: 5
+              creditSale:
+                summary: Against a saved party, due in 15 days
+                value:
+                  invoiceDate: "2026-07-28"
+                  dueDate: "2026-08-12"
+                  partyId: "8f14e45f-ceea-467a-9f5a-1b2c3d4e5f60"
+                  lines:
+                    - name: "Tel 1L"
+                      qty: 12
+                      rate: 150
+                      taxRate: 5
+                      discountPercent: 2
+      responses:
+        "201":
+          description: Invoice created (or replayed from an earlier identical call)
+          headers:
+            Idempotency-Replayed:
+              schema: { type: string, enum: ["true"] }
+              description: Present when this is a replay; no new record was created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  invoice_number: { type: string, example: "INV/2627/00002" }
+                  total_paise: { type: integer, example: 23600 }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/v1/ingest/party:
+    post:
+      tags: [Ingest]
+      summary: Create a customer or supplier
+      operationId: ingestParty
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartyInput"
+            examples:
+              leadCapture:
+                summary: New customer from a web form
+                value:
+                  type: customer
+                  name: "Ramesh Traders"
+                  phone: "9811111111"
+                  gstin: "27ABCDE1234F1Z5"
+      responses:
+        "201":
+          description: Party created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/v1/ingest/payment:
+    post:
+      tags: [Ingest]
+      summary: Record a payment
+      description: |
+        The party balance and the linked invoice's paid amount and status are
+        recomputed by a database trigger, exactly as for a payment entered in
+        the UI. Do not try to adjust balances yourself.
+      operationId: ingestPayment
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+            examples:
+              upiAgainstInvoice:
+                value:
+                  direction: in
+                  partyId: "8f14e45f-ceea-467a-9f5a-1b2c3d4e5f60"
+                  invoiceId: "d5008533-8fb9-42ae-8ee8-513129a0dc5e"
+                  amount: 2500
+                  mode: upi
+                  paymentDate: "2026-07-28"
+      responses:
+        "201":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+  /api/v1/ingest/expense:
+    post:
+      tags: [Ingest]
+      summary: Record an expense
+      operationId: ingestExpense
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+            examples:
+              transport:
+                value:
+                  category: "Transport"
+                  amount: 1200
+                  expense_date: "2026-07-28"
+                  payment_mode: cash
+                  notes: "Tempo bhada"
+      responses:
+        "201":
+          description: Expense recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: |
+        `Authorization: Bearer amk_live_…`
+
+        Mint a key in the app under **Automation → API Keys**. The plaintext is
+        shown exactly once; only a SHA-256 hash is stored, so a lost key cannot
+        be recovered — revoke it and make a new one.
+
+        The whole surface is off until **Automation** is switched on for the
+        business. While off, every endpoint returns `403 feature_disabled`.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        maxLength: 255
+      description: |
+        Any string unique to this logical operation — an n8n execution id works
+        well (`{{ $execution.id }}`).
+
+        - Same key, same body → the original response, `Idempotency-Replayed: true`,
+          nothing new created.
+        - Same key, *different* body → `409`. That means the key is being
+          reused; generate a fresh one.
+
+  schemas:
+    InvoiceInput:
+      type: object
+      required: [invoiceDate, lines]
+      properties:
+        invoiceDate: { type: string, format: date, example: "2026-07-28" }
+        dueDate: { type: string, format: date, nullable: true }
+        partyId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Omit for a cash / walk-in sale.
+        direction:
+          type: string
+          enum: [sale, purchase]
+          default: sale
+        voucherType:
+          type: string
+          enum:
+            [invoice, quotation, proforma, delivery_challan, sales_return,
+             credit_note, purchase_return, debit_note, purchase_order]
+          default: invoice
+        invoiceType:
+          type: string
+          enum: [gst, non_gst]
+          default: gst
+        invoiceNumber:
+          type: string
+          description: |
+            Leave this out. Omitted, the number is generated atomically and the
+            series stays gapless. Supplying your own risks a duplicate.
+        additionalCharges:
+          type: number
+          default: 0
+          description: Freight / packaging, in rupees.
+        roundOff: { type: boolean, default: true }
+        status:
+          type: string
+          enum: [draft, final]
+          default: final
+        notes: { type: string }
+        terms: { type: string }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/InvoiceLine" }
+
+    InvoiceLine:
+      type: object
+      required: [name, qty, rate]
+      properties:
+        name: { type: string, example: "Aata 10kg" }
+        qty: { type: number, example: 2 }
+        rate:
+          type: number
+          description: Unit price in **rupees**; converted to integer paise server-side.
+          example: 450
+        taxRate:
+          type: number
+          default: 0
+          description: GST percent, e.g. 5, 12, 18.
+        discountPercent: { type: number, default: 0 }
+        itemId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Link to the Items catalogue so stock moves for this line.
+        hsn_sac: { type: string }
+        unit: { type: string, default: "PCS" }
+        isTaxInclusive: { type: boolean, default: false }
+
+    PartyInput:
+      type: object
+      required: [type, name]
+      properties:
+        type: { type: string, enum: [customer, supplier, both] }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, format: email }
+        gstin:
+          type: string
+          description: 15 characters. Validated; the state code is derived from it.
+          example: "27ABCDE1234F1Z5"
+        state_code: { type: string, pattern: "^[0-9]{2}$" }
+        billing_address: { type: string }
+        shipping_address: { type: string }
+        opening_balance:
+          type: number
+          default: 0
+          description: Rupees. Positive = the party owes the business.
+        pricing_tier: { type: string, enum: [retail, wholesale], default: retail }
+        credit_period_days: { type: number, default: 0 }
+        credit_limit: { type: number, default: 0 }
+
+    PaymentInput:
+      type: object
+      required: [direction, partyId, amount, paymentDate]
+      properties:
+        direction: { type: string, enum: [in, out] }
+        partyId: { type: string, format: uuid }
+        invoiceId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Settle a specific invoice. Omit for an on-account payment.
+        amount: { type: number, description: Rupees. }
+        mode: { type: string, enum: [cash, upi, bank, card, cheque], default: cash }
+        paymentDate: { type: string, format: date }
+        reference: { type: string }
+        notes: { type: string }
+
+    ExpenseInput:
+      type: object
+      required: [category, amount, expense_date]
+      properties:
+        category: { type: string, example: "Transport" }
+        amount: { type: number, description: Rupees. }
+        expense_date: { type: string, format: date }
+        payment_mode: { type: string, enum: [cash, upi, bank, card, cheque], default: cash }
+        partyId: { type: string, format: uuid, nullable: true }
+        notes: { type: string }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: |
+                Stable machine-readable code — branch on this, never on `message`.
+              enum:
+                [unauthorized, invalid_api_key, feature_disabled, scope_denied,
+                 not_found, idempotency_key_required, idempotency_key_reused,
+                 validation_failed, rate_limited, internal_error]
+            message:
+              type: string
+              description: |
+                Human text, in Hinglish, safe to show an operator. Validation
+                errors name the failing field, e.g.
+                `lines.0.rate: Rate can't be negative.`
+            details: {}
+
+  responses:
+    BadRequest:
+      description: Malformed request — usually a missing `Idempotency-Key`.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing, unknown or revoked API key.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Automation is switched off for this business, or the key lacks the scope.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: The same `Idempotency-Key` was already used with a different body.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationFailed:
+      description: The body did not validate. `message` names the failing field.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: More than 60 requests in a minute for this key.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

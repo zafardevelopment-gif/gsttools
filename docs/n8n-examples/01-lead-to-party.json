@@ -1,0 +1,127 @@
+{
+  "name": "AI Munim — Lead to Party + WhatsApp reply",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Lead Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aimunim-lead",
+        "responseMode": "onReceived",
+        "responseData": "success",
+        "options": {}
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Normalise Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "parameters": {
+        "jsCode": "// Meta lead forms, website forms and Typeform all use different field\n// names. Map them to one shape here so the rest of the workflow is stable.\nconst b = $input.first().json.body ?? $input.first().json;\n\nconst name  = b.name  || b.full_name || b.fullName || '';\nconst phone = String(b.phone || b.phone_number || b.mobile || '').replace(/\\D/g, '').slice(-10);\nconst email = b.email || '';\n\nif (!name && !phone) {\n  throw new Error('Lead has neither name nor phone — nothing to create.');\n}\n\nreturn [{ json: { name: name || `Lead ${phone}`, phone, email } }];"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Create Party in AI Munim",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.AI_MUNIM_URL }}/api/v1/ingest/party",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "=lead-{{ $execution.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ type: 'customer', name: $json.name, phone: $json.phone, email: $json.email }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "operator": { "type": "number", "operation": "equals" },
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 201
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n5",
+      "name": "WhatsApp Acknowledgement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $vars.WA_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: '91' + $('Normalise Lead').item.json.phone, type: 'text', text: { body: `Namaskar ${$('Normalise Lead').item.json.name} ji, aapki enquiry mil gayi hai. Hum thodi hi der me aapse baat karte hain.` } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Log Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 400],
+      "parameters": {
+        "jsCode": "// Party create nahi hui. AI Munim ka error message field ka naam batata\n// hai (jaise \"name: Party name is required.\"), isliye seedha wahi log karo.\nconst r = $input.first().json;\nconsole.error('[aimunim] party create failed', r.statusCode, JSON.stringify(r.body));\nreturn $input.all();"
+      }
+    }
+  ],
+  "connections": {
+    "Lead Form Webhook": { "main": [[{ "node": "Normalise Lead", "type": "main", "index": 0 }]] },
+    "Normalise Lead": { "main": [[{ "node": "Create Party in AI Munim", "type": "main", "index": 0 }]] },
+    "Create Party in AI Munim": { "main": [[{ "node": "Created?", "type": "main", "index": 0 }]] },
+    "Created?": {
+      "main": [
+        [{ "node": "WhatsApp Acknowledgement", "type": "main", "index": 0 }],
+        [{ "node": "Log Failure", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

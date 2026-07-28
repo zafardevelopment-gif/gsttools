@@ -233,7 +233,15 @@ hai. Teen raaste:
 3. **Backoff ko din-bhar ka bana dein** — 1min/5min/25min ki jagah 6/12/24 ghante.
    Imaandaar hai par n8n down hone par reminder ek din late.
 
-Abhi (1) ka intezaam nahi hua hai, isliye retry practically **daily** hai.
+**Hal ho gaya:** ab ek alag halka endpoint hai — `POST /api/cron/sweep` — jo sirf
+pending deliveries retry karta hai, billing ko haath nahi lagata. Isliye har 5
+minute chalana safe hai.
+
+- **Hobby plan:** n8n Schedule node se har 5 minute maarein
+  (`docs/n8n-examples/README.md` me steps hain)
+- **Pro plan:** `vercel.json` me ek aur cron entry `*/5 * * * *`
+
+Jab tak koi ek nahi lagta, retry practically **daily** rahega.
 
 ### 🔴 #8 — `.env.example` mein LIVE credentials pade the
 
@@ -366,7 +374,8 @@ Automation surface ka backend ban chuka hai, par ye abhi baaki hai:
 
 - [x] ~~Automation UI~~ — ban gaya: `app/(app)/automation/`, sidebar +
   `ROLE_ROUTES` dono wired
-- **OpenAPI spec** `docs/automation-api.yaml`
+- [x] ~~OpenAPI spec~~ — `docs/automation-api.yaml` (4 endpoints, 6 schemas)
+- [x] ~~n8n example workflows~~ — `docs/n8n-examples/` (3 workflows + README)
 - **Outbound webhooks** — events, HMAC signing, retry/backoff
 - **n8n example workflows** `docs/n8n-examples/`
 - **`/api/internal` deprecate karna** — ab bhi live hai aur ab bhi kisi bhi

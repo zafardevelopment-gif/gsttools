@@ -1,0 +1,154 @@
+{
+  "name": "AI Munim — Overdue payment reminder ladder",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "AI Munim Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aimunim-events",
+        "responseMode": "onReceived",
+        "responseData": "success",
+        "options": { "rawBody": false }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "parameters": {
+        "jsCode": "// Do NOT remove this node.\n// Without it, anyone who learns this URL can post a fake \"overdue\" event and\n// make you message your own customers.\nconst crypto = require('crypto');\n\nconst SECRET = $vars.AIMUNIM_WEBHOOK_SECRET;   // Automation -> Webhooks -> Dikhayein\nif (!SECRET) throw new Error('AIMUNIM_WEBHOOK_SECRET n8n variable not set');\n\nconst item   = $input.first().json;\nconst raw    = JSON.stringify(item.body);\nconst header = item.headers['x-aimunim-signature'];\nif (!header) throw new Error('Missing X-AiMunim-Signature');\n\nconst parts = Object.fromEntries(header.split(',').map(kv => kv.split('=')));\nconst t = Number(parts.t);\nif (!Number.isFinite(t)) throw new Error('Malformed signature header');\n\n// Freshness window. The timestamp is inside the HMAC, so it cannot be edited\n// to dodge this check — an old captured request stays unusable.\nif (Math.abs(Math.floor(Date.now() / 1000) - t) > 300) {\n  throw new Error('Signature too old — possible replay');\n}\n\nconst expected = crypto.createHmac('sha256', SECRET).update(`${t}.${raw}`).digest('hex');\nif (expected !== parts.v1) throw new Error('Bad signature');\n\nreturn [{ json: item.body }];"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Is invoice.overdue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1",
+              "operator": { "type": "string", "operation": "equals" },
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "invoice.overdue"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Reminder 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $vars.WA_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: '91' + $vars.TEST_CUSTOMER_PHONE, type: 'text', text: { body: `Namaskar, aapka bill ${$json.data.invoice_number} — Rs. ${$json.data.due_rupees} — ${$json.data.due_date} ko due tha. Kripya payment kar dijiye.` } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Wait 3 days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [900, 220],
+      "parameters": { "amount": 3, "unit": "days" },
+      "webhookId": "aimunim-overdue-wait"
+    },
+    {
+      "id": "n6",
+      "name": "Paid by now?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 220],
+      "parameters": {
+        "jsCode": "// AI Munim reminder sequences ko apne aap band nahi karta — wo aapka\n// business rule hai, uska nahi. Isliye doosra reminder bhejne se pehle yahan\n// check karo ki payment aayi ya nahi.\n//\n// Static data me hum har payment.received event ka invoice_id rakhte hain\n// (dekho workflow ka doosra branch).\nconst invoiceId = $('Verify Signature').first().json.data.invoice_id;\nconst paid = $getWorkflowStaticData('global').paidInvoices || {};\n\nif (paid[invoiceId]) {\n  return [];   // payment aa gayi — sequence yahin rok do\n}\nreturn $input.all();"
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Reminder 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v20.0/{{ $vars.WA_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: 'whatsapp', to: '91' + $vars.TEST_CUSTOMER_PHONE, type: 'text', text: { body: `Reminder: bill ${$('Verify Signature').first().json.data.invoice_number} ka Rs. ${$('Verify Signature').first().json.data.due_rupees} abhi pending hai. Koi dikkat ho to bata dijiye.` } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Is payment.received?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 420],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict" },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c2",
+              "operator": { "type": "string", "operation": "equals" },
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "payment.received"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n9",
+      "name": "Mark Invoice Paid",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 420],
+      "parameters": {
+        "jsCode": "// Remember which invoices have been settled so the reminder ladder above\n// can stop. Simple and good enough; for high volume use a real store.\nconst d = $input.first().json.data;\nif (d.invoice_id) {\n  const sd = $getWorkflowStaticData('global');\n  sd.paidInvoices = sd.paidInvoices || {};\n  sd.paidInvoices[d.invoice_id] = true;\n}\nreturn $input.all();"
+      }
+    }
+  ],
+  "connections": {
+    "AI Munim Webhook": { "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]] },
+    "Verify Signature": {
+      "main": [
+        [
+          { "node": "Is invoice.overdue?", "type": "main", "index": 0 },
+          { "node": "Is payment.received?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Is invoice.overdue?": { "main": [[{ "node": "Reminder 1", "type": "main", "index": 0 }], []] },
+    "Reminder 1": { "main": [[{ "node": "Wait 3 days", "type": "main", "index": 0 }]] },
+    "Wait 3 days": { "main": [[{ "node": "Paid by now?", "type": "main", "index": 0 }]] },
+    "Paid by now?": { "main": [[{ "node": "Reminder 2", "type": "main", "index": 0 }]] },
+    "Is payment.received?": { "main": [[{ "node": "Mark Invoice Paid", "type": "main", "index": 0 }], []] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
