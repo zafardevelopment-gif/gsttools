@@ -47,12 +47,16 @@ export const POST = createIngestHandler({
       tenantId: ctx.tenantId,
       userId: null,
       input: {
+        ...input,
         // The shared form schema makes `additionalCharges` required because the
         // invoice form always posts it. Over HTTP that is a pointless trap — a
         // caller with no freight/packaging charge should just omit the field —
         // so default it here rather than changing the schema the UI depends on.
-        additionalCharges: 0,
-        ...input,
+        //
+        // Note the ordering: the default must come AFTER the spread. Putting it
+        // first means the spread always overwrites it (TS2783), which is exactly
+        // the bug that broke the build.
+        additionalCharges: input?.additionalCharges ?? 0,
       },
       source: "api",
       // Plan limits are not applied on this path yet — see known bug #7 in
