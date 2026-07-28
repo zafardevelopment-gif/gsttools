@@ -25,11 +25,19 @@ export function ConfirmDelete({
   title = "Delete this record?",
   description = "This action cannot be undone.",
   trigger,
+  // Optional overrides for destructive actions that aren't literally a delete
+  // (e.g. revoking an API key). Defaults keep every existing caller identical.
+  confirmLabel = "Delete",
+  pendingLabel = "Deleting…",
+  successMessage = "Deleted.",
 }: {
   onConfirm: () => Promise<{ ok?: true; error?: string }>;
   title?: string;
   description?: string;
   trigger?: React.ReactNode;
+  confirmLabel?: string;
+  pendingLabel?: string;
+  successMessage?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -41,7 +49,7 @@ export function ConfirmDelete({
       if (res?.error) {
         toast.error(res.error);
       } else {
-        toast.success("Deleted.");
+        toast.success(successMessage);
         setOpen(false);
         refreshWithRetry(router);
       }
@@ -68,7 +76,7 @@ export function ConfirmDelete({
             Cancel
           </Button>
           <Button variant="destructive" onClick={confirm} disabled={pending}>
-            {pending ? "Deleting…" : "Delete"}
+            {pending ? pendingLabel : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

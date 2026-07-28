@@ -52,6 +52,8 @@ export type TenantRow = Timestamps & {
   tds_enabled: boolean;
   tcs_enabled: boolean;
   custom_units: string[];
+  /** 0013 — master switch for the /api/v1/ingest automation surface. */
+  automation_enabled: boolean;
 }
 
 /** Shape of aimunim_tenants.invoice_settings jsonb (display toggles etc.). */
@@ -470,6 +472,41 @@ type TableDef<Row, Ins, Upd> = {
   Relationships: [];
 };
 
+// ---- 0013 automation surface ------------------------------------------------
+/** An API key is never stored in plaintext — only its SHA-256 and a display head. */
+export type AutomationApiKeyRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  label: string;
+  key_hash: string;
+  key_prefix: string;
+  scopes: string[];
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_by: string | null;
+};
+
+/** Idempotency ledger + inbound activity trail for /api/v1/ingest/*. */
+export type AutomationIngestLogRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  api_key_id: string | null;
+  idempotency_key: string;
+  endpoint: string;
+  request_hash: string;
+  status: "pending" | "succeeded" | "failed";
+  entity_type: string | null;
+  entity_id: string | null;
+  response: Json;
+  error: string | null;
+};
+
+export type AutomationRateLimitRow = {
+  api_key_id: string;
+  window_start: string;
+  hits: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -500,6 +537,9 @@ export type Database = {
       aimunim_online_orders: TableDef<OnlineOrderRow, Insert<OnlineOrderRow, "tenant_id" | "order_number" | "customer_name" | "customer_phone">, Partial<OnlineOrderRow>>;
       aimunim_campaigns: TableDef<CampaignRow, Insert<CampaignRow, "tenant_id" | "name">, Partial<CampaignRow>>;
       aimunim_pending_actions: TableDef<PendingActionRow, Insert<PendingActionRow, "tenant_id" | "phone" | "action" | "payload" | "question">, Partial<PendingActionRow>>;
+      aimunim_automation_api_keys: TableDef<AutomationApiKeyRow, Insert<AutomationApiKeyRow, "tenant_id" | "label" | "key_hash" | "key_prefix">, Partial<AutomationApiKeyRow>>;
+      aimunim_automation_ingest_log: TableDef<AutomationIngestLogRow, Insert<AutomationIngestLogRow, "tenant_id" | "idempotency_key" | "endpoint" | "request_hash">, Partial<AutomationIngestLogRow>>;
+      aimunim_automation_rate_limits: TableDef<AutomationRateLimitRow, AutomationRateLimitRow, Partial<AutomationRateLimitRow>>;
     };
     Views: Record<string, never>;
     Functions: {
@@ -523,6 +563,10 @@ export type Database = {
       gst_next_invoice_number: {
         Args: { p_tenant_id: string; p_direction?: string; p_voucher_type?: string };
         Returns: string;
+      };
+      gst_automation_rate_limit_hit: {
+        Args: { p_api_key_id: string; p_window_seconds?: number };
+        Returns: number;
       };
     };
     Enums: Record<string, never>;

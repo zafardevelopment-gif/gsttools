@@ -16,6 +16,7 @@ import {
   UserCog,
   Warehouse,
   RefreshCw,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/users", label: "Manage Users", icon: UserCog },
       { href: "/orders", label: "Online Orders", icon: ShoppingCart },
       { href: "/marketing", label: "Marketing", icon: Megaphone },
+      { href: "/automation", label: "Automation", icon: Zap },
     ],
   },
   {

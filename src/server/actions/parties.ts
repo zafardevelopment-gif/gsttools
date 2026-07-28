@@ -6,6 +6,7 @@ import { requireActiveContext } from "@/lib/tenant";
 import { partyFormSchema, type PartyFormValues } from "@/lib/validation/party";
 import { stateCodeFromGstin } from "@/lib/validation/common";
 import { rupeesToPaise } from "@/lib/money";
+import { createParty, extraPartyColumns } from "@/server/services/parties";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -29,44 +30,26 @@ function parseParty(formData: FormData) {
   });
 }
 
-/** Column payload for the new (0007) party fields. */
-function extraPartyColumns(v: PartyFormValues) {
-  return {
-    pan: v.pan || null,
-    category: v.category || null,
-    pricing_tier: v.pricing_tier,
-    contact_person: v.contact_person || null,
-    credit_period_days: Math.round(v.credit_period_days),
-    credit_limit_paise: rupeesToPaise(v.credit_limit),
-  };
-}
+// extraPartyColumns now lives in server/services/parties.ts so create (service)
+// and update (below) cannot drift apart on the 0007 column set.
 
 export async function createPartyAction(formData: FormData): Promise<ActionResult> {
   const parsed = parseParty(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const v = parsed.data;
-  const stateCode = v.state_code ?? stateCodeFromGstin(v.gstin) ?? null;
-  const openingPaise = rupeesToPaise(v.opening_balance);
 
-  const { tenantId } = await requireActiveContext();
+  const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("aimunim_parties").insert({
-    tenant_id: tenantId,
-    type: v.type,
-    name: v.name,
-    gstin: v.gstin || null,
-    state_code: stateCode,
-    phone: v.phone || null,
-    email: v.email || null,
-    billing_address: v.billing_address || null,
-    shipping_address: v.shipping_address || null,
-    opening_balance_paise: openingPaise,
-    balance_paise: openingPaise, // no transactions yet
-    ...extraPartyColumns(v),
+  // Shared with the ingest API — see server/services/parties.ts.
+  const res = await createParty({
+    db: supabase,
+    tenantId,
+    userId,
+    input: parsed.data,
+    source: "ui",
   });
+  if (res.error) return { error: res.error };
 
-  if (error) return { error: error.message };
   revalidatePath("/parties");
   return { ok: true };
 }

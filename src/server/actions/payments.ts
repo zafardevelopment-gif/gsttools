@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { paymentInputSchema, type PaymentInput } from "@/lib/validation/payment";
 import { rupeesToPaise } from "@/lib/money";
+import { createPayment } from "@/server/services/payments";
 
 export type ActionResult = { ok?: true; error?: string };
 
@@ -13,27 +14,19 @@ export type ActionResult = { ok?: true; error?: string };
  * party balance and the linked invoice's paid amount + status automatically.
  */
 export async function createPaymentAction(input: PaymentInput): Promise<ActionResult> {
-  const parsed = paymentInputSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
-  const v = parsed.data;
-
   const { tenantId, userId } = await requireActiveContext();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("aimunim_payments").insert({
-    tenant_id: tenantId,
-    party_id: v.partyId,
-    invoice_id: v.invoiceId ?? null,
-    direction: v.direction,
-    amount_paise: rupeesToPaise(v.amount),
-    mode: v.mode,
-    payment_date: v.paymentDate,
-    reference: v.reference || null,
-    notes: v.notes || null,
-    created_by: userId,
+  // Shared with the ingest API — see server/services/payments.ts.
+  const res = await createPayment({
+    db: supabase,
+    tenantId,
+    userId,
+    input,
+    source: "ui",
   });
+  if (res.error) return { error: res.error };
 
-  if (error) return { error: error.message };
   revalidatePath("/payments");
   revalidatePath("/parties");
   revalidatePath("/invoices");

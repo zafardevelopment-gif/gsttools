@@ -23,7 +23,7 @@ export const ROLE_ROUTES: Record<AppRole, "all" | string[]> = {
   partner: [
     "/dashboard", "/invoices", "/pos", "/recurring", "/payments", "/expenses",
     "/cash-bank", "/parties", "/items", "/godowns", "/staff", "/orders",
-    "/marketing", "/reports", "/subscription", "/settings",
+    "/marketing", "/automation", "/reports", "/subscription", "/settings",
   ],
   // CA: read-focused — reports, ledgers, vouchers, cash book.
   ca: ["/dashboard", "/reports", "/invoices", "/cash-bank", "/parties", "/payments"],

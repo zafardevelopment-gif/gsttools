@@ -1,13 +1,9 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/server/notifications";
-import {
-  computeInvoiceTotals,
-  isInterstateSupply,
-  type GstLineInput,
-} from "@/lib/gst";
-import { formatINR, rupeesToPaise } from "@/lib/money";
+import { formatINR, rupeesToPaise, paiseToRupees } from "@/lib/money";
 import { publicEnv } from "@/lib/env";
+import { createInvoice } from "@/server/services/invoices";
 
 /**
  * WhatsApp bill engine (DukaanMitra B01) — the server side of "bolke bill
@@ -58,39 +54,13 @@ export type CreateBillResult = {
   };
 };
 
-/** FY tag like 2627 for Apr-2026..Mar-2027. */
-function fyTag(d = new Date()): string {
-  const start = d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
-  return `${String(start).slice(2)}${String(start + 1).slice(2)}`;
-}
-
-const NUMBER_PREFIX: Record<string, string | null> = {
-  invoice: null, // tenant's own prefix
-  sales_return: "SRN",
-  credit_note: "CRN",
-};
-
-async function nextNumber(
-  admin: Admin,
-  tenantId: string,
-  voucherType: string,
-  tenantPrefix: string,
-): Promise<string> {
-  const { data: counter } = await admin
-    .from("aimunim_invoice_counters")
-    .select("last_seq")
-    .eq("tenant_id", tenantId)
-    .eq("direction", "sale")
-    .eq("voucher_type", voucherType)
-    .maybeSingle();
-  const seq = (counter?.last_seq ?? 0) + 1;
-  await admin.from("aimunim_invoice_counters").upsert(
-    { tenant_id: tenantId, direction: "sale", voucher_type: voucherType, last_seq: seq },
-    { onConflict: "tenant_id,direction,voucher_type" },
-  );
-  const prefix = NUMBER_PREFIX[voucherType] ?? tenantPrefix;
-  return `${prefix}/${fyTag()}/${String(seq).padStart(5, "0")}`;
-}
+/**
+ * Voucher numbering used to live here as a read-then-upsert on
+ * aimunim_invoice_counters, which could race the UI and hand out a duplicate
+ * or skipped number. It now goes through the shared service, which uses the
+ * atomic gst_next_invoice_number RPC. The prefix rules (SRN / CRN / tenant
+ * prefix) live in that RPC too, so they cannot drift apart any more.
+ */
 
 /** Find a party by phone (last-10 match) or name; create a customer if new. */
 export async function findOrCreateParty(
@@ -147,7 +117,7 @@ export async function createWhatsappBill(
 
   const { data: tenant } = await admin
     .from("aimunim_tenants")
-    .select("state_code, invoice_prefix, name, invoice_settings")
+    .select("name, invoice_settings")
     .eq("id", input.tenantId)
     .single();
   if (!tenant) return { error: "Tenant not found." };
@@ -250,107 +220,64 @@ export async function createWhatsappBill(
     return { ok: true, needsConfirmation: true, unmatchedItems };
   }
 
-  const placeOfSupply = party?.state_code || party?.gstin?.slice(0, 2) || undefined;
-  const interstate = isInterstateSupply(tenant.state_code, placeOfSupply);
-
-  const calcLines: GstLineInput[] = resolved.map((l) => ({
-    qty: l.qty,
-    ratePaise: l.ratePaise,
-    taxRate: l.taxRate,
-    discountPercent: 0,
-  }));
-  const totals = computeInvoiceTotals({
-    lines: calcLines,
-    isInterstate: interstate,
-    invoiceType: "gst",
-    additionalChargesPaise: 0,
-    roundOff: true,
-  });
-
-  const number = await nextNumber(
-    admin,
-    input.tenantId,
-    voucherType,
-    tenant.invoice_prefix ?? "INV",
-  );
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: invoice, error: invErr } = await admin
-    .from("aimunim_invoices")
-    .insert({
-      tenant_id: input.tenantId,
-      party_id: party?.id ?? null,
+  // Hand off to the shared invoice service — same numbering RPC, same GST
+  // maths and same stock rules as a bill typed in the UI. Everything above
+  // this line is WhatsApp-specific (speech → catalog resolution); everything
+  // the ledger cares about happens in one place.
+  //
+  // Items this bill just created have no opening-stock baseline, so their
+  // stock movement is suppressed (the `isProduct: false` marker set above).
+  const created = await createInvoice({
+    db: admin,
+    tenantId: input.tenantId,
+    userId: null,
+    source: "whatsapp",
+    // The owner gets a richer, branded message below — don't send the generic
+    // one too, or the customer receives the same bill twice.
+    autoShare: false,
+    skipStockForItemIds: resolved
+      .filter((l) => l.itemId && !l.isProduct)
+      .map((l) => l.itemId as string),
+    input: {
       direction: "sale",
-      voucher_type: voucherType,
-      invoice_type: "gst",
-      invoice_number: number,
-      invoice_date: today,
-      place_of_supply_state: placeOfSupply ?? null,
-      is_interstate: interstate,
-      subtotal_paise: totals.subtotalPaise,
-      discount_paise: totals.discountPaise,
-      taxable_value_paise: totals.taxableValuePaise,
-      cgst_paise: totals.cgstPaise,
-      sgst_paise: totals.sgstPaise,
-      igst_paise: totals.igstPaise,
-      total_tax_paise: totals.totalTaxPaise,
-      additional_charges_paise: 0,
-      round_off_paise: totals.roundOffPaise,
-      total_paise: totals.totalPaise,
-      status: "unpaid",
+      voucherType,
+      invoiceType: "gst",
+      partyId: party?.id ?? null,
+      invoiceDate: today,
+      additionalCharges: 0,
+      roundOff: true,
+      status: "final",
       template: "classic",
       notes: input.notes ?? "Created via WhatsApp",
-    })
-    .select("id")
-    .single();
-  if (invErr || !invoice) return { error: invErr?.message ?? "Bill create nahi hua." };
-
-  await admin.from("aimunim_invoice_items").insert(
-    resolved.map((l, i) => ({
-      tenant_id: input.tenantId,
-      invoice_id: invoice.id,
-      item_id: l.itemId,
-      line_no: i + 1,
-      name: l.name,
-      hsn_sac: l.hsn,
-      unit: l.unit,
-      qty: l.qty,
-      rate_paise: l.ratePaise,
-      discount_percent: 0,
-      discount_paise: totals.lines[i].discountPaise,
-      taxable_value_paise: totals.lines[i].taxableValuePaise,
-      tax_rate: totals.lines[i].taxRate,
-      cgst_paise: totals.lines[i].cgstPaise,
-      sgst_paise: totals.lines[i].sgstPaise,
-      igst_paise: totals.lines[i].igstPaise,
-      amount_paise: totals.lines[i].amountPaise,
-    })),
-  );
-
-  // Stock: invoice = out; sales_return = back in; credit_note = none.
-  if (voucherType !== "credit_note") {
-    const sign = voucherType === "sales_return" ? 1 : -1;
-    const moves = resolved
-      .filter((l) => l.itemId && l.isProduct)
-      .map((l) => ({
-        tenant_id: input.tenantId,
-        item_id: l.itemId as string,
-        qty_delta: sign * l.qty,
-        type: voucherType === "sales_return" ? ("return" as const) : ("sale" as const),
-        reference_type: "invoice",
-        reference_id: invoice.id,
-      }));
-    if (moves.length) await admin.from("aimunim_stock_movements").insert(moves);
+      lines: resolved.map((l) => ({
+        itemId: l.itemId,
+        name: l.name,
+        hsn_sac: l.hsn ?? "",
+        unit: l.unit,
+        qty: l.qty,
+        rate: paiseToRupees(l.ratePaise),
+        taxRate: l.taxRate,
+        discountPercent: 0,
+      })),
+    },
+  });
+  if (created.error || !created.id || !created.invoiceNumber) {
+    return { error: created.error ?? "Bill create nahi hua." };
   }
+  const invoiceId = created.id;
+  const number = created.invoiceNumber;
+  const totalPaise = created.totalPaise ?? 0;
 
   // Payment (B06): cash/upi/bank/card = paid now; credit = udhar ledger (B04).
   if (voucherType === "invoice" && paymentMode !== "credit") {
     await admin.from("aimunim_payments").insert({
       tenant_id: input.tenantId,
       party_id: party?.id ?? null,
-      invoice_id: invoice.id,
+      invoice_id: invoiceId,
       direction: "in",
-      amount_paise: totals.totalPaise,
+      amount_paise: totalPaise,
       mode: paymentMode,
       payment_date: today,
       reference: "WhatsApp bill",
@@ -358,21 +285,21 @@ export async function createWhatsappBill(
   }
 
   // Auto-share PDF to the customer (B01).
-  const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoice.id}/pdf`;
+  const pdfUrl = `${publicEnv.NEXT_PUBLIC_SITE_URL}/invoices/${invoiceId}/pdf`;
   if ((input.autoShare ?? tenantSettings.auto_share !== false) && party?.phone) {
     sendNotification({
       tenantId: input.tenantId,
       type: "invoice_generated",
       recipient: party.phone,
-      body: `Namaskar ${party.name}, ${tenant.name} se aapka bill ${number} — ${formatINR(totals.totalPaise)}${paymentMode === "credit" ? " (udhaar)" : ""}. Dekhen: ${pdfUrl}`,
+      body: `Namaskar ${party.name}, ${tenant.name} se aapka bill ${number} — ${formatINR(totalPaise)}${paymentMode === "credit" ? " (udhaar)" : ""}. Dekhen: ${pdfUrl}`,
       params: {
         name: party.name,
         number,
-        amount: (totals.totalPaise / 100).toFixed(2),
+        amount: (totalPaise / 100).toFixed(2),
         link: pdfUrl,
       },
       entityType: "invoice",
-      entityId: invoice.id,
+      entityId: invoiceId,
     }).catch(() => {});
   }
 
@@ -387,14 +314,22 @@ export async function createWhatsappBill(
     outstanding = p?.balance_paise ?? null;
   }
 
+  // Tax is re-read from the saved row so the WhatsApp reply always quotes what
+  // is actually on the invoice, not a locally recomputed number.
+  const { data: saved } = await admin
+    .from("aimunim_invoices")
+    .select("total_tax_paise")
+    .eq("id", invoiceId)
+    .single();
+
   return {
     ok: true,
     bill: {
-      id: invoice.id,
+      id: invoiceId,
       number,
-      total: formatINR(totals.totalPaise),
-      total_paise: totals.totalPaise,
-      tax_paise: totals.totalTaxPaise,
+      total: formatINR(totalPaise),
+      total_paise: totalPaise,
+      tax_paise: saved?.total_tax_paise ?? 0,
       payment: paymentMode,
       customer: party?.name ?? null,
       customer_outstanding_paise: outstanding,
