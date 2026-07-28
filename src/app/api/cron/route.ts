@@ -9,11 +9,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Scheduler endpoint — run daily (Supabase cron / GitHub Action / n8n):
+ * Scheduler endpoint — run daily (Vercel Cron / n8n / GitHub Action):
  *   curl -X POST https://<app>/api/cron -H "Authorization: Bearer $CRON_SECRET"
  *
  * 1. Generates due recurring invoices (Automated Bills) and auto-shares them.
  * 2. Sends payment reminders per each tenant's reminder rules.
+ * 3. Sends the owner's daily summary.
+ *
+ * See `vercel.json` for the schedule. Both GET and POST are supported: Vercel
+ * Cron issues a GET, everything else here documents POST.
  */
 
 type SnapshotLine = {
@@ -262,3 +266,12 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, date: today, ...results });
 }
+
+/**
+ * Vercel Cron invokes scheduled paths with a **GET**, not a POST — so without
+ * this the job would 405 every night and Automated Bills would silently never
+ * run. When CRON_SECRET is set in the project's env, Vercel sends it as
+ * `Authorization: Bearer <CRON_SECRET>`, which is exactly the check POST
+ * already performs, so the two are the same request in different clothes.
+ */
+export const GET = POST;

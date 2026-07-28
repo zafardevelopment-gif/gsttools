@@ -214,6 +214,7 @@ Ye cheezein dikhengi adhoori, par inpe ruko mat. Launch ke baad, real usage dekh
 | 4 | Floating promises serverless pe kat sakte hain | `server/audit.ts`, `actions/invoices.ts:227` | C |
 | 5 | `README` `GST_` table prefix bolta hai, actual `aimunim_` hai | `README.md` | C |
 | 6 | Dev-persona cookie RLS poori tarah bypass karti hai | `lib/supabase/server.ts:28` | B-SELF |
+| 9 | **Automated Bills + payment reminders production mein chal hi nahi rahe the** — `/api/cron` ko koi trigger nahi karta tha (na `vercel.json`, na pg_cron). Upar se Vercel Cron **GET** bhejta hai jabki route sirf POST export karta tha. Dono fix: `vercel.json` + `export const GET = POST` | `api/cron/route.ts`, `vercel.json` | ✅ fixed |
 | 7 | Plan ka monthly invoice cap **sirf UI pe** lagta hai — WhatsApp voice bill aur recurring bill dono bypass karte hain | `server/gating.ts` `canCreateInvoice` | **faisla chahiye** |
 
 ### 🔴 #8 — `.env.example` mein LIVE credentials pade the
@@ -275,7 +276,7 @@ jo pehle ho.
 
 | # | Sawaal | Kis pe asar |
 |---|---|---|
-| 1 | Deployment: Vercel ya VPS+Docker? | A4, rate limiting, background jobs |
+| ~~1~~ | ~~Deployment: Vercel ya VPS?~~ — **Vercel confirmed** (28 Jul deploy) | tay ho gaya |
 | 2 | Migration source of truth: `migrations/000*.sql` ya `aimunim_final_schema.sql`? | har naya migration |
 | 3 | API-key tenant isolation: app-layer ya `set_config` RLS? | A2 |
 | 4 | `/api/cron` ko production mein abhi kaun trigger karta hai? | A4 |
