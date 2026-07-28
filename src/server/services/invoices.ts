@@ -76,6 +76,12 @@ export type CreateInvoiceParams = {
 export type CreateInvoiceResult = {
   id?: string;
   error?: string;
+  /**
+   * Field-level validation failures. The UI only shows `error` (unchanged), but
+   * an API caller needs to know *which* field was wrong — zod's default message
+   * for a union is a bare "Invalid input", which is useless over HTTP.
+   */
+  issues?: { path: string; message: string }[];
   /** Present on success — callers that message the customer need these. */
   invoiceNumber?: string;
   totalPaise?: number;
@@ -99,7 +105,13 @@ export async function createInvoice({
 }: CreateInvoiceParams): Promise<CreateInvoiceResult> {
   const parsed = invoiceInputSchema.safeParse(input);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Invalid invoice." };
+    return {
+      error: parsed.error.issues[0]?.message ?? "Invalid invoice.",
+      issues: parsed.error.issues.map((i) => ({
+        path: i.path.join(".") || "(root)",
+        message: i.message,
+      })),
+    };
   }
   const v = parsed.data;
 

@@ -46,7 +46,14 @@ export const POST = createIngestHandler({
       db: ctx.db,
       tenantId: ctx.tenantId,
       userId: null,
-      input,
+      input: {
+        // The shared form schema makes `additionalCharges` required because the
+        // invoice form always posts it. Over HTTP that is a pointless trap — a
+        // caller with no freight/packaging charge should just omit the field —
+        // so default it here rather than changing the schema the UI depends on.
+        additionalCharges: 0,
+        ...input,
+      },
       source: "api",
       // Plan limits are not applied on this path yet — see known bug #7 in
       // LAUNCH_CHECKLIST.md. Passing checkPlanLimit here is the one-line fix
@@ -54,7 +61,15 @@ export const POST = createIngestHandler({
     });
 
     if (res.error || !res.id) {
-      return { ok: false, message: res.error ?? "Invoice create nahi hua." };
+      // Surface the failing field. Zod's message alone is often "Invalid
+      // input", which tells an n8n author nothing about what to fix.
+      const detail = res.issues?.length
+        ? res.issues.map((i) => `${i.path}: ${i.message}`).join("; ")
+        : null;
+      return {
+        ok: false,
+        message: detail ?? res.error ?? "Invoice create nahi hua.",
+      };
     }
 
     return {
