@@ -7,7 +7,40 @@ zaroori **nahi** hain — unhe dekh kar ruko mat.
 **Rule:** is file mein naya item tabhi jodo jab wo Section A ke definition pe khara
 utarta ho — *"ye tootega to paisa ya bharosa jaayega."* Baaki sab Section C mein.
 
-Last updated: 2026-07-28 · Status: **A1 code done, verification pending**
+Last updated: 2026-07-28 · Status: **A1–A4 done + outbound webhooks live; 🔴 CRITICAL auth bypass fixed, deploy pending**
+
+---
+
+## 🔴🔴 CRITICAL — dev-persona auth bypass (production mein LIVE tha)
+
+**Kya tha:** koi bhi visitor apne browser me sirf ek cookie set karke —
+`gst_dev_auth=superadmin` — bina kisi login ke platform super-admin panel
+(`/admin`, saare tenants) khol sakta tha. Production pe test karke confirm kiya:
+`/admin` ne HTTP 200 aur tenant-management content diya.
+
+**Wajah:** cookie unsigned hai aur `getDevRole()` + Edge proxy dono uski sirf
+*maujoodgi* pe bharosa karte the — koi env gate nahi. Ye "dev personas aur real
+signup ek hi deployment pe coexist karein" wale design se aaya, par wahi
+production me poora auth bypass ban gaya.
+
+**Fix (2 files):** dev cookie ab sirf tab maani jaati hai jab
+`NEXT_PUBLIC_AUTH_DISABLED === "true"` **aur** `VERCEL_ENV !== "production"`.
+Production me dono gate fail hote hain, cookie ignore hoti hai, sab real
+Supabase auth + RLS se guzarta hai.
+- `src/lib/dev-session.ts` — `getDevRole()`
+- `src/lib/supabase/proxy.ts` — Edge middleware (yahi layer bypass andar de raha tha)
+
+**Aapke login pe asar: nahi.** `mdjunaideqbal1@gmail.com` real auth se login
+hota hai (dev personas sirf `*@aimunim.local` hain). Aap lock nahi honge.
+
+**Deploy ke baad 2 cheezein:**
+1. Ye test dobara chalayein — cookie set karke `/admin` ab **`/login` pe bounce**
+   hona chahiye, 200 nahi.
+2. Agar aapko production me `/admin` (super-admin panel) chahiye, to apna asli
+   email `SUPERADMIN_EMAILS` (Vercel env) me daalein — dev persona wala raasta
+   ab band hai.
+
+---
 
 ---
 

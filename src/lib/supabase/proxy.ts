@@ -41,6 +41,19 @@ function isPublic(pathname: string): boolean {
 /** Cookie set by the dev email+password login (see server/actions/auth.ts). */
 const DEV_AUTH_COOKIE = "gst_dev_auth";
 
+/**
+ * The dev cookie is unsigned — anyone can set it — so it is only trusted on a
+ * deployment that has explicitly disabled real auth, and never on Vercel
+ * production. Kept in sync with lib/dev-session.ts (the two can't share code:
+ * this file runs in the Edge proxy, dev-session.ts is `server-only`).
+ * Both NEXT_PUBLIC_AUTH_DISABLED (build-inlined) and VERCEL_ENV are available
+ * here despite the earlier comment's caution; the production check is the hard
+ * backstop even if the flag is misconfigured.
+ */
+const DEV_PERSONAS_ALLOWED =
+  process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" &&
+  process.env.VERCEL_ENV !== "production";
+
 export async function updateSession(request: NextRequest) {
   // Until Supabase is configured (.env.local), don't gate routes — let the app
   // boot so the landing page and setup docs are reachable.
@@ -49,13 +62,16 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Dev login mode: a present dev-auth cookie means "signed in", so let the
-  // request through (page-level requireTenant resolves the demo tenant). We key
-  // off the cookie rather than the NEXT_PUBLIC_AUTH_DISABLED env flag because
-  // NEXT_PUBLIC_* values are not reliably available in the Edge proxy runtime.
-  const devRole = request.cookies.get(DEV_AUTH_COOKIE)?.value;
-  // "superadmin" | "user" are the current role values; "1" is the legacy value.
-  if (devRole === "superadmin" || devRole === "user" || devRole === "1") {
-    return NextResponse.next({ request });
+  // request through (page-level requireTenant resolves the demo tenant).
+  // Only honoured on dev/staging — see DEV_PERSONAS_ALLOWED. In production this
+  // whole branch is skipped, so the unsigned cookie grants nothing and the real
+  // Supabase auth check below runs for everyone.
+  if (DEV_PERSONAS_ALLOWED) {
+    const devRole = request.cookies.get(DEV_AUTH_COOKIE)?.value;
+    // "superadmin" | "user" are the current role values; "1" is the legacy value.
+    if (devRole === "superadmin" || devRole === "user" || devRole === "1") {
+      return NextResponse.next({ request });
+    }
   }
 
   let supabaseResponse = NextResponse.next({ request });
