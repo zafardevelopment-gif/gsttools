@@ -187,10 +187,12 @@ function NewKeyDialog() {
     startTransition(async () => {
       const res = await createApiKeyAction(String(fd.get("label") ?? ""));
       if (res.error) toast.error(res.error);
-      else if (res.key) {
-        setSecret(res.key);
-        refreshWithRetry(router);
-      }
+      else if (res.key) setSecret(res.key);
+      // Deliberately NOT refreshing here. refreshWithRetry fires router.refresh()
+      // several times over the next second or so; each RSC refresh remounts this
+      // subtree and resets `secret` to null — so the one-time key would vanish
+      // from under the user before they could copy it. The list is refreshed in
+      // close() instead, once they have dismissed the dialog.
     });
   }
 
@@ -209,8 +211,11 @@ function NewKeyDialog() {
   function close(next: boolean) {
     setOpen(next);
     if (!next) {
+      const hadKey = secret !== null;
       setSecret(null);
       setCopied(false);
+      // Pull the new key into the table only after the secret is safely gone.
+      if (hadKey) refreshWithRetry(router);
     }
   }
 

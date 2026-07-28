@@ -214,6 +214,7 @@ Ye cheezein dikhengi adhoori, par inpe ruko mat. Launch ke baad, real usage dekh
 | 4 | Floating promises serverless pe kat sakte hain | `server/audit.ts`, `actions/invoices.ts:227` | C |
 | 5 | `README` `GST_` table prefix bolta hai, actual `aimunim_` hai | `README.md` | C |
 | 6 | Dev-persona cookie RLS poori tarah bypass karti hai | `lib/supabase/server.ts:28` | B-SELF |
+| 10 | **Nayi API key ka secret dialog se apne aap gayab ho jaata tha** — `refreshWithRetry` ke baar-baar RSC refresh se dialog remount hota tha aur `secret` state reset. Ek hi baar dikhne wali key user ke copy karne se pehle chali jaati. Ab refresh dialog band hone ke baad hota hai | `automation-client.tsx` | ✅ fixed |
 | 9 | **Automated Bills + payment reminders production mein chal hi nahi rahe the** — `/api/cron` ko koi trigger nahi karta tha (na `vercel.json`, na pg_cron). Upar se Vercel Cron **GET** bhejta hai jabki route sirf POST export karta tha. Dono fix: `vercel.json` + `export const GET = POST` | `api/cron/route.ts`, `vercel.json` | ✅ fixed |
 | 7 | Plan ka monthly invoice cap **sirf UI pe** lagta hai — WhatsApp voice bill aur recurring bill dono bypass karte hain | `server/gating.ts` `canCreateInvoice` | **faisla chahiye** |
 
