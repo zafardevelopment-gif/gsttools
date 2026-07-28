@@ -214,9 +214,26 @@ Ye cheezein dikhengi adhoori, par inpe ruko mat. Launch ke baad, real usage dekh
 | 4 | Floating promises serverless pe kat sakte hain | `server/audit.ts`, `actions/invoices.ts:227` | C |
 | 5 | `README` `GST_` table prefix bolta hai, actual `aimunim_` hai | `README.md` | C |
 | 6 | Dev-persona cookie RLS poori tarah bypass karti hai | `lib/supabase/server.ts:28` | B-SELF |
+| 11 | **Webhook retry backoff (1min / 5min / 25min) bekaar hai** — retry sirf cron sweep se hota hai, aur `vercel.json` mein cron **din mein ek baar** (`30 3 * * *`) chalta hai. Yaani fail hui delivery 1 minute baad nahi, **agle din** retry hogi | `vercel.json`, `dispatch.ts` | **faisla chahiye** |
 | 10 | **Nayi API key ka secret dialog se apne aap gayab ho jaata tha** — `refreshWithRetry` ke baar-baar RSC refresh se dialog remount hota tha aur `secret` state reset. Ek hi baar dikhne wali key user ke copy karne se pehle chali jaati. Ab refresh dialog band hone ke baad hota hai | `automation-client.tsx` | ✅ fixed |
 | 9 | **Automated Bills + payment reminders production mein chal hi nahi rahe the** — `/api/cron` ko koi trigger nahi karta tha (na `vercel.json`, na pg_cron). Upar se Vercel Cron **GET** bhejta hai jabki route sirf POST export karta tha. Dono fix: `vercel.json` + `export const GET = POST` | `api/cron/route.ts`, `vercel.json` | ✅ fixed |
 | 7 | Plan ka monthly invoice cap **sirf UI pe** lagta hai — WhatsApp voice bill aur recurring bill dono bypass karte hain | `server/gating.ts` `canCreateInvoice` | **faisla chahiye** |
+
+### #11 pe faisla chahiye — sweep kitni baar chale
+
+Delivery retry ka backoff 1/5/25 minute ka hai, par sweep din mein ek baar chalta
+hai. Teen raaste:
+
+1. **n8n se sweep trigger karein (recommended)** — n8n Schedule node har 5 minute
+   `POST /api/cron` maare. Free hai, aapke paas n8n pehle se hai, aur agency model
+   mein fit baithta hai. Billing wala kaam din mein ek hi baar chalega kyunki wo
+   date se guard hai.
+2. **Vercel cron badhayein** — `vercel.json` mein `*/5 * * * *`. Hobby plan pe
+   **daily se zyada allowed nahi** hai; Pro chahiye.
+3. **Backoff ko din-bhar ka bana dein** — 1min/5min/25min ki jagah 6/12/24 ghante.
+   Imaandaar hai par n8n down hone par reminder ek din late.
+
+Abhi (1) ka intezaam nahi hua hai, isliye retry practically **daily** hai.
 
 ### 🔴 #8 — `.env.example` mein LIVE credentials pade the
 

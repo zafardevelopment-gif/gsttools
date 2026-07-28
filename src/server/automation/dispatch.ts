@@ -1,6 +1,14 @@
 import "server-only";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
+import {
+  generateWebhookSecret,
+  signPayload,
+  verifySignature,
+} from "@/server/automation/primitives";
+
+// Implementations live in primitives.ts (pure, unit-tested there); re-exported
+// so callers have one import site for the dispatch surface.
+export { generateWebhookSecret, signPayload, verifySignature };
 
 /**
  * Webhook delivery: signing, sending, retrying, auto-disabling.
@@ -24,52 +32,6 @@ const AUTO_DISABLE_AFTER = 20;
 
 /** Never let one slow endpoint hold a serverless function open. */
 const TIMEOUT_MS = 10_000;
-
-export function generateWebhookSecret(): string {
-  return "whsec_" + randomBytes(24).toString("base64url");
-}
-
-export function signPayload(
-  secret: string,
-  rawBody: string,
-  timestampSeconds: number,
-): string {
-  const mac = createHmac("sha256", secret)
-    .update(`${timestampSeconds}.${rawBody}`)
-    .digest("hex");
-  return `t=${timestampSeconds},v1=${mac}`;
-}
-
-/**
- * Reference verifier — exported so the docs (and tests) can show receivers
- * exactly what to implement. Constant-time compare, and a freshness window.
- */
-export function verifySignature(params: {
-  secret: string;
-  rawBody: string;
-  header: string;
-  toleranceSeconds?: number;
-  nowSeconds?: number;
-}): boolean {
-  const parts = Object.fromEntries(
-    params.header.split(",").map((kv) => kv.split("=") as [string, string]),
-  );
-  const t = Number(parts.t);
-  const v1 = parts.v1;
-  if (!Number.isFinite(t) || !v1) return false;
-
-  const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
-  const tolerance = params.toleranceSeconds ?? 300;
-  if (Math.abs(now - t) > tolerance) return false;
-
-  const expected = createHmac("sha256", params.secret)
-    .update(`${t}.${params.rawBody}`)
-    .digest("hex");
-
-  const a = Buffer.from(expected, "utf8");
-  const b = Buffer.from(v1, "utf8");
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 type Admin = ReturnType<typeof createAdminClient>;
 

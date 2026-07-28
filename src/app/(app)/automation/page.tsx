@@ -1,3 +1,9 @@
+import {
+  KeyRound,
+  Webhook,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+} from "lucide-react";
 import { requireRouteAccess } from "@/lib/auth";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,6 +19,15 @@ import {
 
 export const metadata = { title: "Automation · AI Munim" };
 export const dynamic = "force-dynamic";
+
+/** Small count pill sitting inside a tab label. */
+function TabCount({ n }: { n: number }) {
+  return (
+    <span className="ml-0.5 rounded-full bg-foreground/10 px-1.5 py-px text-[11px] font-semibold tabular-nums">
+      {n}
+    </span>
+  );
+}
 
 /**
  * Automation — API keys, and the log of everything n8n (or any workflow) has
@@ -85,6 +100,13 @@ export default async function AutomationPage() {
 
   const canManage = ctx.role === "owner" || ctx.role === "admin";
 
+  // Counts on the tabs: the owner can see at a glance whether anything has
+  // actually gone out, without opening each tab to find an empty table.
+  const keyCount = (keys ?? []).filter((k) => !k.revoked_at).length;
+  const hookCount = (hooks ?? []).filter((h) => h.is_active).length;
+  const activityCount = (activity ?? []).length;
+  const deliveryCount = deliveryRows.length;
+
   return (
     <div>
       <PageHeader
@@ -96,11 +118,29 @@ export default async function AutomationPage() {
 
       {enabled && (
         <Tabs defaultValue="keys" className="mt-6">
-          <TabsList className="mb-2 w-full max-w-full flex-nowrap justify-start gap-1 overflow-x-auto sm:w-auto [&>*]:shrink-0">
-            <TabsTrigger value="keys">API Keys</TabsTrigger>
-            <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
-            <TabsTrigger value="activity">Andar aaya</TabsTrigger>
-            <TabsTrigger value="outbound">Bahar gaya</TabsTrigger>
+          {/*
+            Deliberately NOT w-full: the base style is `w-fit`, so letting the
+            list hug its labels renders a proper segmented control. Stretching
+            it edge-to-edge (with flex-1 triggers) flattens it into a single
+            grey strip that reads as a divider, not as tabs.
+          */}
+          <TabsList className="mb-5 h-9 max-w-full overflow-x-auto [&>*]:shrink-0 [&>*]:px-3">
+            <TabsTrigger value="keys">
+              <KeyRound /> API Keys
+              {keyCount > 0 && <TabCount n={keyCount} />}
+            </TabsTrigger>
+            <TabsTrigger value="webhooks">
+              <Webhook /> Webhooks
+              {hookCount > 0 && <TabCount n={hookCount} />}
+            </TabsTrigger>
+            <TabsTrigger value="activity">
+              <ArrowDownToLine /> Andar aaya
+              {activityCount > 0 && <TabCount n={activityCount} />}
+            </TabsTrigger>
+            <TabsTrigger value="outbound">
+              <ArrowUpFromLine /> Bahar gaya
+              {deliveryCount > 0 && <TabCount n={deliveryCount} />}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="keys">

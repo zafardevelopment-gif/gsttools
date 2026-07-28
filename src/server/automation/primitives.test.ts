@@ -4,6 +4,9 @@ import {
   hashApiKey,
   hashRequestBody,
   redactSecrets,
+  generateWebhookSecret,
+  signPayload,
+  verifySignature,
 } from "@/server/automation/primitives";
 
 /**
@@ -65,6 +68,78 @@ describe("hashRequestBody", () => {
   it("handles null/undefined without throwing", () => {
     expect(() => hashRequestBody(undefined)).not.toThrow();
     expect(hashRequestBody(null)).toBe(hashRequestBody(undefined));
+  });
+});
+
+describe("webhook signing", () => {
+  const secret = generateWebhookSecret();
+  const body = JSON.stringify({ type: "invoice.created", data: { total: 236 } });
+  const now = 1_800_000_000;
+
+  it("produces a header a receiver can verify", () => {
+    const header = signPayload(secret, body, now);
+    expect(header).toMatch(/^t=\d+,v1=[a-f0-9]{64}$/);
+    expect(
+      verifySignature({ secret, rawBody: body, header, nowSeconds: now }),
+    ).toBe(true);
+  });
+
+  it("rejects a tampered body — the whole point of signing", () => {
+    const header = signPayload(secret, body, now);
+    const tampered = JSON.stringify({ type: "invoice.created", data: { total: 1 } });
+    expect(
+      verifySignature({ secret, rawBody: tampered, header, nowSeconds: now }),
+    ).toBe(false);
+  });
+
+  it("rejects the wrong secret", () => {
+    const header = signPayload(secret, body, now);
+    expect(
+      verifySignature({
+        secret: generateWebhookSecret(),
+        rawBody: body,
+        header,
+        nowSeconds: now,
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects a replayed request once it is stale", () => {
+    const header = signPayload(secret, body, now);
+    // Same valid signature, 10 minutes later.
+    expect(
+      verifySignature({ secret, rawBody: body, header, nowSeconds: now + 600 }),
+    ).toBe(false);
+    // Still inside the 5-minute window.
+    expect(
+      verifySignature({ secret, rawBody: body, header, nowSeconds: now + 60 }),
+    ).toBe(true);
+  });
+
+  it("rejects a timestamp swapped to dodge the freshness check", () => {
+    // An attacker who rewrites `t` invalidates the MAC, because `t` is part of
+    // the signed material — this is why the timestamp is inside the HMAC.
+    const header = signPayload(secret, body, now);
+    const forged = header.replace(`t=${now}`, `t=${now + 600}`);
+    expect(
+      verifySignature({ secret, rawBody: body, header: forged, nowSeconds: now + 600 }),
+    ).toBe(false);
+  });
+
+  it("rejects malformed headers instead of throwing", () => {
+    for (const header of ["", "garbage", "t=abc,v1=xyz", "v1=only"]) {
+      expect(() =>
+        verifySignature({ secret, rawBody: body, header, nowSeconds: now }),
+      ).not.toThrow();
+      expect(
+        verifySignature({ secret, rawBody: body, header, nowSeconds: now }),
+      ).toBe(false);
+    }
+  });
+
+  it("issues a distinct secret each time", () => {
+    const secrets = new Set(Array.from({ length: 100 }, () => generateWebhookSecret()));
+    expect(secrets.size).toBe(100);
   });
 });
 

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /**
  * Pure primitives for the automation surface: key generation, hashing and
@@ -52,6 +52,63 @@ export function generateApiKey(): {
  */
 export function hashRequestBody(body: unknown): string {
   return createHash("sha256").update(JSON.stringify(body ?? null)).digest("hex");
+}
+
+// ---- Webhook signing (0014) -------------------------------------------------
+
+export function generateWebhookSecret(): string {
+  return "whsec_" + randomBytes(24).toString("base64url");
+}
+
+/**
+ * Sign an outbound webhook payload.
+ *
+ * The HMAC covers `"<timestamp>.<raw body>"`, not the body alone. That is what
+ * makes a captured request un-replayable: with the timestamp outside the signed
+ * material, an attacker could resend yesterday's valid payload forever and it
+ * would still verify.
+ */
+export function signPayload(
+  secret: string,
+  rawBody: string,
+  timestampSeconds: number,
+): string {
+  const mac = createHmac("sha256", secret)
+    .update(`${timestampSeconds}.${rawBody}`)
+    .digest("hex");
+  return `t=${timestampSeconds},v1=${mac}`;
+}
+
+/**
+ * Reference verifier — what a receiver (n8n Function node) should implement.
+ * Exported so the docs and tests use the same code the docs describe.
+ */
+export function verifySignature(params: {
+  secret: string;
+  rawBody: string;
+  header: string;
+  toleranceSeconds?: number;
+  nowSeconds?: number;
+}): boolean {
+  const parts = Object.fromEntries(
+    params.header.split(",").map((kv) => kv.split("=") as [string, string]),
+  );
+  const t = Number(parts.t);
+  const v1 = parts.v1;
+  if (!Number.isFinite(t) || !v1) return false;
+
+  // Freshness window: an old-but-validly-signed request must still be rejected.
+  const now = params.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const tolerance = params.toleranceSeconds ?? 300;
+  if (Math.abs(now - t) > tolerance) return false;
+
+  const expected = createHmac("sha256", params.secret)
+    .update(`${t}.${params.rawBody}`)
+    .digest("hex");
+
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(v1, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 const SECRET_KEY_RE =
