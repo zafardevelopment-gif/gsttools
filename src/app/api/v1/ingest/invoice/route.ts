@@ -6,6 +6,34 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
+ * Fill in the fields the invoice *form* always posts but an HTTP caller has no
+ * reason to send.
+ *
+ * The shared schema builds these with a `numberish(0)` helper, which looks like
+ * it carries a default but does not — the argument is only a fallback for
+ * unparseable values, so zod still treats the field as required. Harmless for
+ * the UI (the form posts every field); a pointless trap over HTTP, where a
+ * caller with no discount should simply omit `discountPercent`.
+ *
+ * Normalising here rather than in `lib/validation/invoice.ts` keeps the UI's
+ * validation behaviour untouched.
+ *
+ * Ordering matters: defaults come AFTER the spread. Putting them first lets the
+ * spread overwrite them (TS2783) — that mistake already broke one build.
+ */
+function withApiDefaults(input: InvoiceInput): InvoiceInput {
+  return {
+    ...input,
+    additionalCharges: input?.additionalCharges ?? 0,
+    lines: input?.lines?.map((l) => ({
+      ...l,
+      taxRate: l.taxRate ?? 0,
+      discountPercent: l.discountPercent ?? 0,
+    })),
+  };
+}
+
+/**
  * POST /api/v1/ingest/invoice
  *
  * Creates an invoice from an automation workflow. This calls the exact same
@@ -16,12 +44,15 @@ export const dynamic = "force-dynamic";
  * Headers:  Authorization: Bearer amk_live_…   (required)
  *           Idempotency-Key: <unique string>   (required)
  *
- * Body: the same shape as the invoice form. Minimal example:
+ * Minimal body — everything else is defaulted by withApiDefaults():
  *   {
  *     "invoiceDate": "2026-07-28",
  *     "partyId": "…uuid…",
  *     "lines": [{ "name": "Aata 10kg", "qty": 2, "rate": 450, "taxRate": 5 }]
  *   }
+ *
+ * Required per line: `name`, `qty`, `rate`. `taxRate` and `discountPercent`
+ * default to 0. `partyId` may be omitted for a cash/counter sale.
  *
  * `tenantId` is NOT accepted in the body — it comes from the API key. That is
  * the whole security difference from the old /api/internal.
@@ -46,18 +77,7 @@ export const POST = createIngestHandler({
       db: ctx.db,
       tenantId: ctx.tenantId,
       userId: null,
-      input: {
-        ...input,
-        // The shared form schema makes `additionalCharges` required because the
-        // invoice form always posts it. Over HTTP that is a pointless trap — a
-        // caller with no freight/packaging charge should just omit the field —
-        // so default it here rather than changing the schema the UI depends on.
-        //
-        // Note the ordering: the default must come AFTER the spread. Putting it
-        // first means the spread always overwrites it (TS2783), which is exactly
-        // the bug that broke the build.
-        additionalCharges: input?.additionalCharges ?? 0,
-      },
+      input: withApiDefaults(input),
       source: "api",
       // Plan limits are not applied on this path yet — see known bug #7 in
       // LAUNCH_CHECKLIST.md. Passing checkPlanLimit here is the one-line fix
