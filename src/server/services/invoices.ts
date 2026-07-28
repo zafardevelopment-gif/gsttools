@@ -12,6 +12,7 @@ import { VOUCHER_TYPES } from "@/lib/constants";
 import { sendNotification } from "@/server/notifications";
 import { publicEnv } from "@/lib/env";
 import { logAudit } from "@/server/audit";
+import { emitEvent } from "@/server/automation/events";
 import type { GateResult } from "@/server/gating";
 
 /**
@@ -345,6 +346,30 @@ export async function createInvoice({
     entityId: invoice.id,
     data: { number: invoiceNumber, total_paise: totals.totalPaise, source },
   });
+
+  // Outbound event for automation workflows. Only real, finalised invoices —
+  // a draft or a quotation is not something an n8n reminder should fire on.
+  // Fire-and-forget by design: see server/automation/events.ts.
+  if (v.voucherType === "invoice" && status !== "draft") {
+    emitEvent({
+      tenantId,
+      type: "invoice.created",
+      entityType: "invoice",
+      entityId: invoice.id,
+      payload: {
+        invoice_id: invoice.id,
+        invoice_number: invoiceNumber,
+        invoice_date: v.invoiceDate,
+        due_date: v.dueDate || null,
+        direction: v.direction,
+        total_paise: totals.totalPaise,
+        total_rupees: totals.totalPaise / 100,
+        tax_paise: totals.totalTaxPaise,
+        party_id: v.partyId ?? null,
+        source,
+      },
+    });
+  }
 
   return {
     id: invoice.id,

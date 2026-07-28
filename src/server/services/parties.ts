@@ -3,6 +3,7 @@ import { partyFormSchema, type PartyFormInput, type PartyFormValues } from "@/li
 import { stateCodeFromGstin } from "@/lib/validation/common";
 import { rupeesToPaise } from "@/lib/money";
 import { logAudit } from "@/server/audit";
+import { emitEvent } from "@/server/automation/events";
 import type { DbClient } from "@/server/services/invoices";
 
 /**
@@ -71,6 +72,22 @@ export async function createParty(params: {
     entityType: "party",
     entityId: data.id,
     data: { name: v.name, source: params.source ?? "ui" },
+  });
+
+  emitEvent({
+    tenantId: params.tenantId,
+    type: "party.created",
+    entityType: "party",
+    entityId: data.id,
+    payload: {
+      party_id: data.id,
+      name: v.name,
+      type: v.type,
+      phone: v.phone || null,
+      email: v.email || null,
+      gstin: v.gstin || null,
+      source: params.source ?? "ui",
+    },
   });
 
   return { id: data.id };

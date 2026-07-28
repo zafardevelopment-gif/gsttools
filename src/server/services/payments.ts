@@ -2,6 +2,7 @@ import "server-only";
 import { paymentInputSchema, type PaymentInput } from "@/lib/validation/payment";
 import { rupeesToPaise } from "@/lib/money";
 import { logAudit } from "@/server/audit";
+import { emitEvent } from "@/server/automation/events";
 import type { DbClient } from "@/server/services/invoices";
 
 /**
@@ -47,6 +48,8 @@ export async function createPayment(params: {
 
   if (error || !data) return { error: error?.message ?? "Could not record payment." };
 
+  const amountPaise = rupeesToPaise(v.amount);
+
   logAudit({
     tenantId: params.tenantId,
     userId: params.userId ?? null,
@@ -54,11 +57,33 @@ export async function createPayment(params: {
     entityType: "payment",
     entityId: data.id,
     data: {
-      amount_paise: rupeesToPaise(v.amount),
+      amount_paise: amountPaise,
       direction: v.direction,
       source: params.source ?? "ui",
     },
   });
+
+  // Money coming IN is what automations care about — it's the signal that stops
+  // a payment-reminder sequence. Payments out are recorded but not broadcast.
+  if (v.direction === "in") {
+    emitEvent({
+      tenantId: params.tenantId,
+      type: "payment.received",
+      entityType: "payment",
+      entityId: data.id,
+      payload: {
+        payment_id: data.id,
+        party_id: v.partyId,
+        invoice_id: v.invoiceId ?? null,
+        amount_paise: amountPaise,
+        amount_rupees: amountPaise / 100,
+        mode: v.mode,
+        payment_date: v.paymentDate,
+        reference: v.reference || null,
+        source: params.source ?? "ui",
+      },
+    });
+  }
 
   return { id: data.id };
 }

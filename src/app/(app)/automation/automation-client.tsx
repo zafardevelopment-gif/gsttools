@@ -12,12 +12,19 @@ import {
   KeyRound,
   Trash2,
   ScrollText,
+  Webhook,
+  Send,
 } from "lucide-react";
 import { refreshWithRetry } from "@/lib/refresh-with-retry";
+import { AUTOMATION_EVENT_LABELS as EVENT_LABELS } from "@/lib/constants";
 import {
   createApiKeyAction,
   revokeApiKeyAction,
   setAutomationEnabledAction,
+  createWebhookAction,
+  deleteWebhookAction,
+  reactivateWebhookAction,
+  sendTestEventAction,
 } from "@/server/actions/automation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +70,21 @@ function EmptyState({
     </div>
   );
 }
+
+/** Shared by the inbound ingest log and the outbound delivery log. */
+type RunStatus = "pending" | "succeeded" | "failed";
+
+const STATUS_LABEL: Record<RunStatus, string> = {
+  succeeded: "Ho gaya",
+  failed: "Fail",
+  pending: "Chal raha hai",
+};
+
+const STATUS_VARIANT: Record<RunStatus, "default" | "secondary" | "destructive"> = {
+  succeeded: "default",
+  failed: "destructive",
+  pending: "secondary",
+};
 
 function formatWhen(iso: string | null): string {
   if (!iso) return "—";
@@ -386,6 +408,296 @@ export function ApiKeyList({
 }
 
 // ---------------------------------------------------------------------------
+// Webhooks (outbound)
+// ---------------------------------------------------------------------------
+
+type WebhookRow = {
+  id: string;
+  label: string;
+  target_url: string;
+  secret: string;
+  events: string[];
+  is_active: boolean;
+  consecutive_failures: number;
+  last_success_at: string | null;
+};
+
+function NewWebhookDialog() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const res = await createWebhookAction({
+        label: String(fd.get("label") ?? ""),
+        url: String(fd.get("url") ?? ""),
+        // Empty = sab events. v1 me per-event chunav nahi, kyunki zyadatar
+        // workflows n8n ke andar hi filter karte hain.
+        events: [],
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Webhook add ho gaya.");
+        setOpen(false);
+        refreshWithRetry(router);
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>
+          <Plus className="size-4" /> Naya webhook
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Naya webhook</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="wh_label">Naam</Label>
+            <Input id="wh_label" name="label" placeholder="n8n production" required />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wh_url">n8n Webhook URL</Label>
+            <Input
+              id="wh_url"
+              name="url"
+              type="url"
+              placeholder="https://n8n.aapkadomain.com/webhook/aimunim"
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Sirf https chalega. n8n me Webhook node banayein aur uska
+              Production URL yahan paste karein.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Add kar rahe hain…" : "Add karein"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function WebhookList({
+  hooks,
+  canManage,
+}: {
+  hooks: WebhookRow[];
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [shown, setShown] = useState<string | null>(null);
+
+  function test(id: string) {
+    startTransition(async () => {
+      const res = await sendTestEventAction(id);
+      if (res.error) toast.error(res.error);
+      else toast.success("Test event bhej diya — n8n me check karein.");
+      refreshWithRetry(router);
+    });
+  }
+
+  function reactivate(id: string) {
+    startTransition(async () => {
+      const res = await reactivateWebhookAction(id);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Webhook dobara chalu ho gaya.");
+        refreshWithRetry(router);
+      }
+    });
+  }
+
+  if (!canManage) {
+    return (
+      <EmptyState icon={Webhook} title="Sirf owner ya admin ke liye">
+        Webhooks me signing secret hota hai, isliye sirf owner ya admin dekh sakte hain.
+      </EmptyState>
+    );
+  }
+
+  if (hooks.length === 0) {
+    return (
+      <div className="space-y-4">
+        <EmptyState icon={Webhook} title="Abhi koi webhook nahi hai">
+          Webhook lagane par AI Munim khud aapko batayega — bill bana, payment
+          aayi, stock kam hua. Tab n8n reminder ya report bhej sakta hai, bina
+          baar-baar poochhe.
+        </EmptyState>
+        <div className="flex justify-center">
+          <NewWebhookDialog />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <NewWebhookDialog />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {hooks.map((h) => (
+          <Card key={h.id}>
+            <CardContent className="space-y-3 pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold">{h.label}</p>
+                  <p className="truncate text-xs text-muted-foreground" title={h.target_url}>
+                    {h.target_url}
+                  </p>
+                </div>
+                {h.is_active ? (
+                  <Badge variant="secondary">Active</Badge>
+                ) : (
+                  <Badge variant="destructive">Band</Badge>
+                )}
+              </div>
+
+              {!h.is_active && (
+                <p className="rounded-md bg-destructive/5 p-2 text-xs text-destructive">
+                  Lagatar {h.consecutive_failures} baar fail hua, isliye apne aap band
+                  kar diya. n8n theek karke dobara chalu karein.
+                </p>
+              )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Signing secret</Label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={shown === h.id ? h.secret : "•".repeat(24)}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShown(shown === h.id ? null : h.id)}
+                  >
+                    {shown === h.id ? "Chhupayein" : "Dikhayein"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Isse n8n me <code>X-AiMunim-Signature</code> verify karein — taaki
+                  koi aur aapke workflow ko fake data na bhej sake.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={pending} onClick={() => test(h.id)}>
+                  <Send className="size-3.5" /> Test bhejein
+                </Button>
+                {!h.is_active && (
+                  <Button size="sm" variant="outline" disabled={pending} onClick={() => reactivate(h.id)}>
+                    Dobara chalu karein
+                  </Button>
+                )}
+                <ConfirmDelete
+                  title={`"${h.label}" hatayein?`}
+                  description="Is endpoint pe aage koi event nahi jayega. Purani delivery history bani rahegi."
+                  confirmLabel="Hata dein"
+                  pendingLabel="Hata rahe hain…"
+                  successMessage="Webhook hat gaya."
+                  onConfirm={() => deleteWebhookAction(h.id)}
+                  trigger={
+                    <Button size="sm" variant="ghost" className="text-destructive">
+                      <Trash2 className="size-3.5" /> Hatayein
+                    </Button>
+                  }
+                />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Outbound delivery log
+// ---------------------------------------------------------------------------
+
+type DeliveryRow = {
+  id: string;
+  attempt: number;
+  status: "pending" | "succeeded" | "failed";
+  response_code: number | null;
+  error: string | null;
+  created_at: string;
+  event_type: string | null;
+  webhook_label: string | null;
+};
+
+export function DeliveryLog({ rows }: { rows: DeliveryRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <EmptyState icon={Send} title="Abhi tak koi event bhej nahi paye">
+        Jab bill banega ya payment aayegi, AI Munim aapke webhook pe event bhejega
+        aur har koshish yahan dikhegi — kaunsa event, kitni baar try kiya, aur
+        jawab kya mila.
+      </EmptyState>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Kab</TableHead>
+              <TableHead>Event</TableHead>
+              <TableHead>Kahan</TableHead>
+              <TableHead>Koshish</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                  {formatWhen(r.created_at)}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {EVENT_LABELS[r.event_type ?? ""] ?? r.event_type ?? "—"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {r.webhook_label ?? "—"}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">#{r.attempt}</TableCell>
+                <TableCell>
+                  <Badge variant={STATUS_VARIANT[r.status]}>
+                    {STATUS_LABEL[r.status]}
+                    {r.response_code ? ` · ${r.response_code}` : ""}
+                  </Badge>
+                  {r.error && (
+                    <p className="mt-1 max-w-xs text-xs text-destructive">{r.error}</p>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Activity log
 // ---------------------------------------------------------------------------
 
@@ -398,18 +710,6 @@ type ActivityRow = {
   entity_id: string | null;
   error: string | null;
   created_at: string;
-};
-
-const STATUS_LABEL: Record<ActivityRow["status"], string> = {
-  succeeded: "Ho gaya",
-  failed: "Fail",
-  pending: "Chal raha hai",
-};
-
-const STATUS_VARIANT: Record<ActivityRow["status"], "default" | "secondary" | "destructive"> = {
-  succeeded: "default",
-  failed: "destructive",
-  pending: "secondary",
 };
 
 const ENDPOINT_LABEL: Record<string, string> = {

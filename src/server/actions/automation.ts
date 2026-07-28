@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveContext } from "@/lib/tenant";
 import { generateApiKey } from "@/server/automation/auth";
+import { generateWebhookSecret } from "@/server/automation/dispatch";
+import { emitEvent } from "@/server/automation/events";
 import { logAudit } from "@/server/audit";
 
 export type ActionResult = { ok?: true; error?: string };
@@ -99,6 +101,146 @@ export async function revokeApiKeyAction(id: string): Promise<ActionResult> {
     action: "automation.key_revoked",
     entityType: "automation_api_key",
     entityId: id,
+  });
+
+  revalidatePath("/automation");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Webhooks (outbound)
+// ---------------------------------------------------------------------------
+
+export async function createWebhookAction(input: {
+  label: string;
+  url: string;
+  events: string[];
+}): Promise<ActionResult> {
+  const label = input.label.trim() || "n8n";
+  const url = input.url.trim();
+
+  // Reject anything that isn't a real https endpoint before it can ever be
+  // signed and posted to. http:// would leak the payload in transit.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: "URL sahi nahi hai. Poora URL daalein, jaise https://…" };
+  }
+  if (parsed.protocol !== "https:") {
+    return { error: "Sirf https URL chalega — http pe data khula jaata hai." };
+  }
+
+  const { tenantId, userId, role } = await requireActiveContext();
+  if (!MANAGER_ROLES.includes(role)) {
+    return { error: "Sirf owner ya admin webhook add kar sakte hain." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("aimunim_automation_webhooks")
+    .insert({
+      tenant_id: tenantId,
+      label,
+      target_url: url,
+      secret: generateWebhookSecret(),
+      // Empty array = subscribe to everything.
+      events: input.events ?? [],
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) return { error: error?.message ?? "Webhook add nahi hua." };
+
+  logAudit({
+    tenantId,
+    userId,
+    action: "automation.webhook_created",
+    entityType: "automation_webhook",
+    entityId: data.id,
+    data: { label, host: parsed.host },
+  });
+
+  revalidatePath("/automation");
+  return { ok: true };
+}
+
+export async function deleteWebhookAction(id: string): Promise<ActionResult> {
+  const { tenantId, userId, role } = await requireActiveContext();
+  if (!MANAGER_ROLES.includes(role)) {
+    return { error: "Sirf owner ya admin webhook hata sakte hain." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("aimunim_automation_webhooks")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: error.message };
+
+  logAudit({
+    tenantId,
+    userId,
+    action: "automation.webhook_deleted",
+    entityType: "automation_webhook",
+    entityId: id,
+  });
+
+  revalidatePath("/automation");
+  return { ok: true };
+}
+
+/** Re-enable an endpoint that was auto-disabled after repeated failures. */
+export async function reactivateWebhookAction(id: string): Promise<ActionResult> {
+  const { tenantId, role } = await requireActiveContext();
+  if (!MANAGER_ROLES.includes(role)) {
+    return { error: "Sirf owner ya admin ye kar sakte hain." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("aimunim_automation_webhooks")
+    .update({ is_active: true, consecutive_failures: 0 })
+    .eq("id", id)
+    .eq("tenant_id", tenantId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/automation");
+  return { ok: true };
+}
+
+/**
+ * Fire a test event at one endpoint so the user can confirm their n8n workflow
+ * receives and verifies it — without having to create a real invoice first.
+ */
+export async function sendTestEventAction(webhookId: string): Promise<ActionResult> {
+  const { tenantId, role } = await requireActiveContext();
+  if (!MANAGER_ROLES.includes(role)) {
+    return { error: "Sirf owner ya admin test bhej sakte hain." };
+  }
+
+  const supabase = await createClient();
+  const { data: hook } = await supabase
+    .from("aimunim_automation_webhooks")
+    .select("id")
+    .eq("id", webhookId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!hook) return { error: "Webhook nahi mila." };
+
+  emitEvent({
+    tenantId,
+    type: "invoice.created",
+    entityType: "test",
+    entityId: null,
+    payload: {
+      test: true,
+      message: "Ye AI Munim ka test event hai. Aapka endpoint sahi chal raha hai.",
+      invoice_number: "TEST/0000/00000",
+      total_rupees: 100,
+    },
   });
 
   revalidatePath("/automation");

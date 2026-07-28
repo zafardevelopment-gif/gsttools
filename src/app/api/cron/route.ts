@@ -4,6 +4,8 @@ import { sendNotification } from "@/server/notifications";
 import { formatINR, paiseToRupees } from "@/lib/money";
 import { publicEnv } from "@/lib/env";
 import { createInvoice } from "@/server/services/invoices";
+import { emitEvent } from "@/server/automation/events";
+import { sweepPendingDeliveries } from "@/server/automation/dispatch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +62,8 @@ export async function POST(req: NextRequest) {
     invoicesCreated: 0,
     remindersSent: 0,
     ownerSummaries: 0,
+    eventsEmitted: 0,
+    deliveriesRetried: 0,
     errors: [] as string[],
   };
 
@@ -262,6 +266,81 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       results.errors.push(`summary ${t.id}: ${e instanceof Error ? e.message : e}`);
     }
+  }
+
+  // ---- 4. Outbound events: overdue invoices + low stock ----------------------
+  // Emitted here rather than on a timer inside the app because "overdue" and
+  // "low stock" are states, not actions — nothing happens at the moment they
+  // become true, so something has to come looking.
+  try {
+    const { data: overdue } = await admin
+      .from("aimunim_invoices")
+      .select("id, tenant_id, invoice_number, party_id, total_paise, amount_paid_paise, due_date")
+      .eq("direction", "sale")
+      .eq("voucher_type", "invoice")
+      .lt("due_date", today)
+      .in("status", ["unpaid", "partial"])
+      .limit(500);
+
+    for (const inv of overdue ?? []) {
+      emitEvent({
+        tenantId: inv.tenant_id,
+        type: "invoice.overdue",
+        entityType: "invoice",
+        entityId: inv.id,
+        payload: {
+          invoice_id: inv.id,
+          invoice_number: inv.invoice_number,
+          party_id: inv.party_id,
+          due_date: inv.due_date,
+          due_paise: inv.total_paise - inv.amount_paid_paise,
+          due_rupees: (inv.total_paise - inv.amount_paid_paise) / 100,
+        },
+      });
+      results.eventsEmitted += 1;
+    }
+  } catch (e) {
+    results.errors.push(`overdue events: ${e instanceof Error ? e.message : e}`);
+  }
+
+  try {
+    const { data: lowStock } = await admin
+      .from("aimunim_items")
+      .select("id, tenant_id, name, stock_qty, low_stock_level, unit")
+      .eq("type", "product")
+      .eq("is_active", true)
+      .gt("low_stock_level", 0)
+      .limit(500);
+
+    for (const item of lowStock ?? []) {
+      if (item.stock_qty > item.low_stock_level) continue;
+      emitEvent({
+        tenantId: item.tenant_id,
+        type: "stock.low",
+        entityType: "item",
+        entityId: item.id,
+        payload: {
+          item_id: item.id,
+          name: item.name,
+          stock_qty: item.stock_qty,
+          low_stock_level: item.low_stock_level,
+          unit: item.unit,
+        },
+      });
+      results.eventsEmitted += 1;
+    }
+  } catch (e) {
+    results.errors.push(`low stock events: ${e instanceof Error ? e.message : e}`);
+  }
+
+  // ---- 5. Retry webhook deliveries that failed earlier -----------------------
+  // Also the safety net for events whose after() dispatch never got to run.
+  try {
+    const sweep = await sweepPendingDeliveries();
+    results.deliveriesRetried = sweep.retried;
+    results.errors.push(...sweep.errors);
+  } catch (e) {
+    results.errors.push(`delivery sweep: ${e instanceof Error ? e.message : e}`);
   }
 
   return NextResponse.json({ ok: true, date: today, ...results });

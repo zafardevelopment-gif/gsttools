@@ -297,6 +297,31 @@ jo pehle ho.
 - [ ] **Pilot** — 2-3 free tenants, 6 hafte
 - [ ] **Section B** — raasta chunkar
 
+### Production smoke test — 28 Jul, PASS ✅
+
+Live deployment pe browser se chalaya gaya (`aimunim.aivexallp.com`):
+
+| Test | Result |
+|---|---|
+| Bina auth header | `401 unauthorized` ✓ |
+| Galat key / galat prefix | `401 invalid_api_key` ✓ |
+| `Idempotency-Key` nadarad | `400 idempotency_key_required` ✓ |
+| Invoice create | `201` — `INV/2627/00002`, ₹236.00 ✓ |
+| **Wahi key dobara** | **`Idempotency-Replayed: true`, wahi invoice id — naya invoice NAHI bana** ✓ |
+| Wahi key, alag body | `409 idempotency_key_reused` ✓ |
+| Galat field | `422` + `lines.0.rate: Rate can't be negative.` ✓ |
+| Key UI se banti hai, secret ek baar dikhta hai | ✓ |
+| `last_used_at` track hota hai | ✓ |
+| Activity Log mein har request dikhti hai | ✓ |
+| **API invoice UI invoice jaisa hi hai** | Tax Invoice layout, intra-state CGST+SGST auto-detect, ₹200 taxable + ₹18 + ₹18 = ₹236, saare actions (PDF/WhatsApp/Edit/Record payment) available ✓ |
+
+Yaani **n8n ka retry duplicate invoice nahi banayega** — A2 ki sabse zaroori
+guarantee production mein prove ho chuki hai.
+
+Abhi bhi baaki: `npm test` (unit) aur integration suite (`supabase start` wali) —
+gapless numbering *under concurrency* aur cross-tenant denial abhi tak sirf likhe
+hue tests hain, chalaye nahi gaye.
+
 ### Verification gate — ye poora hue bina A1/A2 "done" nahi hain
 
 Saara code sandbox mein likha gaya hai jahan `node_modules` Windows-native hai

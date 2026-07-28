@@ -507,6 +507,45 @@ export type AutomationRateLimitRow = {
   hits: number;
 };
 
+// ---- 0014 outbound webhooks -------------------------------------------------
+/** The outbox: one row per thing that happened, delivered asynchronously. */
+export type AutomationEventRow = {
+  id: string;
+  tenant_id: string;
+  event_type: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  payload: Json;
+  created_at: string;
+};
+
+export type AutomationWebhookRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  label: string;
+  target_url: string;
+  /** Shared secret the receiver uses to verify X-AiMunim-Signature. */
+  secret: string;
+  /** Subscribed event types; empty array means "everything". */
+  events: string[];
+  is_active: boolean;
+  consecutive_failures: number;
+  last_success_at: string | null;
+};
+
+/** One row per delivery attempt, so retries are visible individually. */
+export type AutomationDeliveryRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  webhook_id: string;
+  event_id: string;
+  attempt: number;
+  status: "pending" | "succeeded" | "failed";
+  response_code: number | null;
+  error: string | null;
+  next_retry_at: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -540,6 +579,9 @@ export type Database = {
       aimunim_automation_api_keys: TableDef<AutomationApiKeyRow, Insert<AutomationApiKeyRow, "tenant_id" | "label" | "key_hash" | "key_prefix">, Partial<AutomationApiKeyRow>>;
       aimunim_automation_ingest_log: TableDef<AutomationIngestLogRow, Insert<AutomationIngestLogRow, "tenant_id" | "idempotency_key" | "endpoint" | "request_hash">, Partial<AutomationIngestLogRow>>;
       aimunim_automation_rate_limits: TableDef<AutomationRateLimitRow, AutomationRateLimitRow, Partial<AutomationRateLimitRow>>;
+      aimunim_automation_events: TableDef<AutomationEventRow, Insert<AutomationEventRow, "tenant_id" | "event_type">, Partial<AutomationEventRow>>;
+      aimunim_automation_webhooks: TableDef<AutomationWebhookRow, Insert<AutomationWebhookRow, "tenant_id" | "target_url" | "secret">, Partial<AutomationWebhookRow>>;
+      aimunim_automation_deliveries: TableDef<AutomationDeliveryRow, Insert<AutomationDeliveryRow, "tenant_id" | "webhook_id" | "event_id">, Partial<AutomationDeliveryRow>>;
     };
     Views: Record<string, never>;
     Functions: {

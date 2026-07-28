@@ -210,6 +210,24 @@ export const PURCHASE_VOUCHER_TYPES: VoucherTypeKey[] = [
   "debit_note",
 ];
 
+/**
+ * Hinglish labels for outbound automation events (0014).
+ *
+ * Client-safe by design — the Automation screen is a Client Component and the
+ * event module itself is `server-only`. The owner reading the delivery log is
+ * not a developer, so "payment.received" is shown as "Payment aayi".
+ */
+export const AUTOMATION_EVENT_LABELS: Record<string, string> = {
+  "invoice.created": "Bill bana",
+  "invoice.paid": "Bill pura chuk gaya",
+  "invoice.overdue": "Bill overdue hua",
+  "payment.received": "Payment aayi",
+  "party.created": "Nayi party judi",
+  "stock.low": "Stock kam hua",
+  "order.received": "Online order aaya",
+  "subscription.expiring": "Subscription khatam hone wali hai",
+};
+
 /** Outbound notification channels (WhatsApp-first; SMS dormant). */
 export const NOTIFICATION_CHANNELS = ["whatsapp", "sms", "both"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
