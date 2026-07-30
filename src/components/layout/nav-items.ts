@@ -17,6 +17,7 @@ import {
   Warehouse,
   RefreshCw,
   Zap,
+  ScanText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/payments", label: "Payments", icon: Wallet },
   { href: "/cash-bank", label: "Cash & Bank", icon: Landmark },
   { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/bill-scan", label: "Bill Scan", icon: ScanText },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/staff", label: "Staff & Payroll", icon: UserCheck },
   { href: "/orders", label: "Online Orders", icon: ShoppingCart },
@@ -61,6 +63,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/recurring", label: "Automated Bills", icon: RefreshCw },
       { href: "/payments", label: "Payments", icon: Wallet },
       { href: "/expenses", label: "Expenses", icon: Receipt },
+      { href: "/bill-scan", label: "Bill Scan", icon: ScanText },
     ],
   },
   {

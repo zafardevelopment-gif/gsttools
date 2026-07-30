@@ -72,6 +72,11 @@ const serverSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional().default(""),
   RAZORPAY_KEY_SECRET: z.string().optional().default(""),
   SUPERADMIN_EMAILS: z.string().optional().default(""),
+  // Bill scanning (OCR/extraction) — see server/services/bill-scan.ts.
+  // Unset = the feature returns a friendly "not configured" error instead of
+  // crashing, same pattern as WHATSAPP_ACCESS_TOKEN.
+  OPENROUTER_API_KEY: z.string().optional().default(""),
+  OPENROUTER_VISION_MODEL: z.string().optional().default(""),
 });
 
 export function getServerEnv() {

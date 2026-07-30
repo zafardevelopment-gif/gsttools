@@ -256,6 +256,23 @@ export type ExpenseRow = Timestamps & {
   created_by: string | null;
 }
 
+export type BillScanRow = Timestamps & {
+  id: string;
+  tenant_id: string;
+  type: "purchase" | "expense" | "other";
+  status: "pending" | "confirmed" | "failed";
+  image_path: string;
+  vendor_name: string | null;
+  bill_date: string | null;
+  amount_paise: number | null;
+  category: string | null;
+  notes: string | null;
+  raw_extracted: Json | null;
+  ai_error: string | null;
+  expense_id: string | null;
+  created_by: string | null;
+}
+
 export type StockMovementRow = {
   id: string;
   tenant_id: string;
@@ -558,6 +575,7 @@ export type Database = {
       aimunim_invoice_items: TableDef<InvoiceItemRow, Insert<InvoiceItemRow, "tenant_id" | "invoice_id" | "name">, Partial<InvoiceItemRow>>;
       aimunim_payments: TableDef<PaymentRow, Insert<PaymentRow, "tenant_id" | "direction" | "amount_paise">, Partial<PaymentRow>>;
       aimunim_expenses: TableDef<ExpenseRow, Insert<ExpenseRow, "tenant_id" | "amount_paise">, Partial<ExpenseRow>>;
+      aimunim_bill_scans: TableDef<BillScanRow, Insert<BillScanRow, "tenant_id" | "image_path">, Partial<BillScanRow>>;
       aimunim_stock_movements: TableDef<StockMovementRow, Insert<StockMovementRow, "tenant_id" | "item_id" | "qty_delta" | "type">, Partial<StockMovementRow>>;
       aimunim_audit_logs: TableDef<AuditLogRow, Insert<AuditLogRow, "tenant_id" | "action">, Partial<AuditLogRow>>;
       aimunim_invoice_counters: TableDef<InvoiceCounterRow, InvoiceCounterRow, Partial<InvoiceCounterRow>>;
