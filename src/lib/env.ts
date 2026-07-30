@@ -88,5 +88,7 @@ export function getServerEnv() {
     RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET,
     SUPERADMIN_EMAILS: process.env.SUPERADMIN_EMAILS,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY?.trim(),
+    OPENROUTER_VISION_MODEL: process.env.OPENROUTER_VISION_MODEL?.trim(),
   });
 }
