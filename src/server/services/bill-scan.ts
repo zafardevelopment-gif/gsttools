@@ -18,15 +18,16 @@ const BUCKET = "bill-scans";
 
 /**
  * OpenRouter vision models to try, in order. Free tiers first (rate-limited
- * and occasionally deprecated by upstream), then a cheap paid fallback so
- * scanning still works if every free option is unavailable that day.
- * Override with OPENROUTER_VISION_MODEL to pin a single model.
+ * and occasionally deprecated/renamed by upstream — check
+ * https://openrouter.ai/collections/free-models if these start 404ing),
+ * then a cheap paid fallback so scanning still works if every free option is
+ * unavailable that day. Override with OPENROUTER_VISION_MODEL to pin one.
  */
 const DEFAULT_MODEL_CHAIN = [
-  "google/gemini-2.0-flash-exp:free",
-  "qwen/qwen2.5-vl-72b-instruct:free",
-  "meta-llama/llama-3.2-11b-vision-instruct:free",
-  "google/gemini-flash-1.5-8b",
+  "nvidia/nemotron-nano-12b-v2-vl:free", // document/OCR-tuned — best fit for bills
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "google/gemini-3.1-flash-lite", // cheap paid fallback
 ];
 
 // ---- Image upload ------------------------------------------------------------
