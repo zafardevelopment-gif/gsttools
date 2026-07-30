@@ -97,7 +97,7 @@ async function callOpenRouterVision(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://aimunim.app",
-      "X-Title": "AI Munim — Bill Scan",
+      "X-Title": "AI Munim - Bill Scan",
     },
     body: JSON.stringify({
       model,
