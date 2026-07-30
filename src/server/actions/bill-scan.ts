@@ -51,7 +51,7 @@ export async function confirmBillScanAction(formData: FormData): Promise<ActionR
       id: formData.get("id") as string,
       type: asType(formData.get("type")),
       vendor_name: (formData.get("vendor_name") as string) || undefined,
-      amount: formData.get("amount") ?? 0,
+      amount: (formData.get("amount") as string) ?? "0",
       bill_date: formData.get("bill_date") as string,
       category: formData.get("category") as string,
       notes: (formData.get("notes") as string) || undefined,
