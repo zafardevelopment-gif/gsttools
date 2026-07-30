@@ -15,11 +15,21 @@ import {
 } from "@/lib/validation/bill-scan";
 import type { BillScanRow } from "@/lib/database.types";
 
+const normalizeName = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+
 /**
- * Match an existing supplier/both party by name (case-insensitive), or create
- * one — same "auto-profile on first bill" pattern the WhatsApp billing engine
- * uses for customers (server/billing/whatsapp-bill.ts). Lets a "purchase"
- * scan land on the right party ledger without the owner typing it in twice.
+ * Match an existing supplier/both party by name, or create one — same
+ * "auto-profile on first bill" pattern the WhatsApp billing engine uses for
+ * customers (server/billing/whatsapp-bill.ts). Lets a "purchase" scan land on
+ * the right party ledger without the owner typing it in twice.
+ *
+ * The AI doesn't extract the vendor name identically every time (e.g. "Test
+ * Traders" one scan, "Test Traders Wholesale Supplier" the next, off the same
+ * bill header) — a plain equality/ILIKE check would create a duplicate
+ * supplier per phrasing. So this pulls the tenant's existing suppliers and
+ * does a normalized, bidirectional substring match in JS instead of a single
+ * SQL pattern (there's no one ILIKE pattern that catches "A contains B" and
+ * "B contains A" at once).
  */
 async function findOrCreateSupplierParty(
   db: DbClient,
@@ -29,16 +39,19 @@ async function findOrCreateSupplierParty(
 ): Promise<string | null> {
   const name = vendorName?.trim();
   if (!name) return null;
+  const target = normalizeName(name);
 
-  const { data: existing } = await db
+  const { data: candidates } = await db
     .from("aimunim_parties")
-    .select("id")
+    .select("id, name")
     .eq("tenant_id", tenantId)
-    .in("type", ["supplier", "both"])
-    .ilike("name", name)
-    .limit(1)
-    .maybeSingle();
-  if (existing) return existing.id;
+    .in("type", ["supplier", "both"]);
+
+  const match = (candidates ?? []).find((p) => {
+    const existingName = normalizeName(p.name);
+    return existingName === target || existingName.includes(target) || target.includes(existingName);
+  });
+  if (match) return match.id;
 
   const res = await createParty({
     db,
@@ -53,18 +66,24 @@ async function findOrCreateSupplierParty(
 const BUCKET = "bill-scans";
 
 /**
- * OpenRouter vision models to try, in order. Free tiers first (rate-limited
- * and occasionally deprecated/renamed by upstream — check
- * https://openrouter.ai/collections/free-models if these start 404ing),
- * then a cheap paid fallback so scanning still works if every free option is
- * unavailable that day. Override with OPENROUTER_VISION_MODEL to pin one.
+ * OpenRouter vision models to try, in order. The cheap paid model goes FIRST:
+ * free-tier models on OpenRouter are frequently queued/slow (a single scan
+ * measured 50-60s falling through 3 free models before landing on this one),
+ * which is a bad wait for someone scanning a bill, and they're occasionally
+ * deprecated/renamed by upstream (check
+ * https://openrouter.ai/collections/free-models if these start 404ing).
+ * Free models stay as a fallback in case the paid one is ever down.
+ * Override with OPENROUTER_VISION_MODEL to pin a single model.
  */
 const DEFAULT_MODEL_CHAIN = [
-  "nvidia/nemotron-nano-12b-v2-vl:free", // document/OCR-tuned — best fit for bills
+  "google/gemini-3.1-flash-lite", // fast + cheap — primary
+  "nvidia/nemotron-nano-12b-v2-vl:free", // document/OCR-tuned fallback
   "google/gemma-4-31b-it:free",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "google/gemini-3.1-flash-lite", // cheap paid fallback
 ];
+
+/** Per-model request timeout — don't let one slow/queued model eat the whole scan. */
+const MODEL_TIMEOUT_MS = 20_000;
 
 // ---- Image upload ------------------------------------------------------------
 
@@ -130,6 +149,7 @@ async function callOpenRouterVision(
 
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
