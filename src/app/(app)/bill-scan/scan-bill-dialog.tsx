@@ -222,6 +222,11 @@ export function ScanBillDialog() {
                   : "AI ne yeh data nikala hai. Galat ho to edit karke confirm karein."}
               </DialogDescription>
             </DialogHeader>
+            {aiError && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive break-words">
+                {aiError}
+              </p>
+            )}
             {imageUrl && (
               preview?.isPdf ? (
                 <a
