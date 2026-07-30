@@ -37,11 +37,12 @@ export async function uploadBillImage(
   file: File,
 ): Promise<string> {
   if (!file || file.size === 0) throw new Error("Bill image is required.");
-  if (file.size > 8 * 1024 * 1024) throw new Error("Image max 8 MB honi chahiye.");
-  if (!/^image\/(png|jpe?g|webp|heic|heif)$/.test(file.type)) {
-    throw new Error("PNG/JPG/WEBP image hi chalegi.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("File max 8 MB honi chahiye.");
+  if (!/^image\/(png|jpe?g|webp|heic|heif)$/.test(file.type) && file.type !== "application/pdf") {
+    throw new Error("PNG/JPG/WEBP image ya PDF hi chalega.");
   }
-  const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+  const ext =
+    file.type === "application/pdf" ? "pdf" : file.type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
   const path = `${tenantId}/${scanId}.${ext}`;
   const admin = createAdminClient();
   const { error } = await admin.storage
@@ -79,9 +80,17 @@ If the image is not a bill/receipt at all, set all fields to null except confide
 
 async function callOpenRouterVision(
   model: string,
-  imageDataUrl: string,
+  dataUrl: string,
+  mimeType: string,
   apiKey: string,
 ): Promise<unknown> {
+  // PDFs go through OpenRouter's "file" content part (document understanding,
+  // supported by Gemini/Claude-family models); photos use "image_url" as usual.
+  const filePart =
+    mimeType === "application/pdf"
+      ? { type: "file", file: { filename: "bill.pdf", file_data: dataUrl } }
+      : { type: "image_url", image_url: { url: dataUrl } };
+
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -95,14 +104,14 @@ async function callOpenRouterVision(
       messages: [
         {
           role: "user",
-          content: [
-            { type: "text", text: EXTRACTION_PROMPT },
-            { type: "image_url", image_url: { url: imageDataUrl } },
-          ],
+          content: [{ type: "text", text: EXTRACTION_PROMPT }, filePart],
         },
       ],
       temperature: 0,
       max_tokens: 500,
+      ...(mimeType === "application/pdf"
+        ? { plugins: [{ id: "file-parser", pdf: { engine: "native" } }] }
+        : {}),
     }),
   });
 
@@ -143,13 +152,13 @@ export async function extractBillData(
     };
   }
 
-  const imageDataUrl = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
+  const dataUrl = `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
   const modelChain = OPENROUTER_VISION_MODEL ? [OPENROUTER_VISION_MODEL] : DEFAULT_MODEL_CHAIN;
 
   let lastError = "";
   for (const model of modelChain) {
     try {
-      const raw = await callOpenRouterVision(model, imageDataUrl, OPENROUTER_API_KEY);
+      const raw = await callOpenRouterVision(model, dataUrl, mimeType, OPENROUTER_API_KEY);
       const parsed = billScanExtractionSchema.safeParse(raw);
       if (!parsed.success) {
         lastError = `${model}: unexpected response shape.`;

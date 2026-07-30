@@ -4,7 +4,7 @@ import { refreshWithRetry } from "@/lib/refresh-with-retry";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ScanText, Loader2, ImagePlus } from "lucide-react";
+import { ScanText, Loader2, ImagePlus, FileText } from "lucide-react";
 import { scanBillAction, confirmBillScanAction } from "@/server/actions/bill-scan";
 import { BILL_SCAN_TYPES, type BillScanType } from "@/lib/validation/bill-scan";
 import { DEFAULT_EXPENSE_CATEGORIES } from "@/lib/constants";
@@ -47,7 +47,7 @@ export function ScanBillDialog() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [type, setType] = useState<BillScanType>("expense");
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ url: string; isPdf: boolean; name: string } | null>(null);
 
   const [row, setRow] = useState<BillScanRow | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -76,7 +76,11 @@ export function ScanBillDialog() {
 
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    setPreview(file ? URL.createObjectURL(file) : null);
+    setPreview(
+      file
+        ? { url: URL.createObjectURL(file), isPdf: file.type === "application/pdf", name: file.name }
+        : null,
+    );
   }
 
   function onScan(e: React.FormEvent<HTMLFormElement>) {
@@ -163,24 +167,31 @@ export function ScanBillDialog() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="image">Bill photo</Label>
+                <Label htmlFor="image">Bill photo or PDF</Label>
                 <Input
                   ref={fileRef}
                   id="image"
                   name="image"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf"
                   capture="environment"
                   required
                   onChange={onPickFile}
                 />
                 {preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={preview}
-                    alt="Bill preview"
-                    className="mt-2 max-h-56 w-full rounded-md border object-contain"
-                  />
+                  preview.isPdf ? (
+                    <div className="mt-2 flex h-32 flex-col items-center justify-center gap-1 rounded-md border text-muted-foreground">
+                      <FileText className="size-6" />
+                      <span className="max-w-[90%] truncate text-xs">{preview.name}</span>
+                    </div>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.url}
+                      alt="Bill preview"
+                      className="mt-2 max-h-56 w-full rounded-md border object-contain"
+                    />
+                  )
                 ) : (
                   <div className="mt-2 flex h-32 items-center justify-center rounded-md border border-dashed text-muted-foreground">
                     <ImagePlus className="size-6" />
@@ -212,8 +223,19 @@ export function ScanBillDialog() {
               </DialogDescription>
             </DialogHeader>
             {imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="Scanned bill" className="max-h-40 w-full rounded-md border object-contain" />
+              preview?.isPdf ? (
+                <a
+                  href={imageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex h-16 items-center gap-2 rounded-md border px-3 text-sm text-muted-foreground hover:bg-muted"
+                >
+                  <FileText className="size-5" /> View uploaded PDF
+                </a>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt="Scanned bill" className="max-h-40 w-full rounded-md border object-contain" />
+              )
             )}
             <form onSubmit={onConfirm} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

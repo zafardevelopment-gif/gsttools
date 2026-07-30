@@ -1,6 +1,7 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
+import { FileText } from "lucide-react";
 import { deleteBillScanAction } from "@/server/actions/bill-scan";
 import { formatINR } from "@/lib/money";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -57,12 +58,18 @@ export function BillScansTable({ scans }: { scans: BillScanWithUrl[] }) {
               <TableCell>
                 {s.imageUrl ? (
                   <a href={s.imageUrl} target="_blank" rel="noreferrer">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={s.imageUrl}
-                      alt="Bill"
-                      className="size-10 rounded object-cover border"
-                    />
+                    {s.image_path.toLowerCase().endsWith(".pdf") ? (
+                      <span className="flex size-10 items-center justify-center rounded border bg-muted">
+                        <FileText className="size-5 text-muted-foreground" />
+                      </span>
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={s.imageUrl}
+                        alt="Bill"
+                        className="size-10 rounded object-cover border"
+                      />
+                    )}
                   </a>
                 ) : (
                   <span className="text-muted-foreground">—</span>
