@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { FileText } from "lucide-react";
+import { FileText, ExternalLink } from "lucide-react";
 import { deleteBillScanAction } from "@/server/actions/bill-scan";
 import { formatINR } from "@/lib/money";
 import { ConfirmDelete } from "@/components/confirm-delete";
@@ -49,6 +50,7 @@ export function BillScansTable({ scans }: { scans: BillScanWithUrl[] }) {
             <TableHead className="text-right">Amount</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Linked to</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -84,10 +86,26 @@ export function BillScansTable({ scans }: { scans: BillScanWithUrl[] }) {
               <TableCell>{s.category || "—"}</TableCell>
               <TableCell><StatusBadge status={s.status} /></TableCell>
               <TableCell>
+                {s.invoice_id ? (
+                  <Link
+                    href={`/invoices/${s.invoice_id}`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Purchase bill <ExternalLink className="size-3" />
+                  </Link>
+                ) : s.expense_id ? (
+                  <Link href="/expenses" className="inline-flex items-center gap-1 text-primary hover:underline">
+                    Expense <ExternalLink className="size-3" />
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+              <TableCell>
                 <ConfirmDelete
                   onConfirm={() => deleteBillScanAction(s.id)}
                   title="Delete this bill scan?"
-                  description="Photo aur extracted data dono delete ho jaayenge. Agar expense ban chuka hai to woh alag se rahega."
+                  description="Photo aur extracted data dono delete ho jaayenge. Agar purchase invoice/expense ban chuka hai to woh alag se rahega."
                 />
               </TableCell>
             </TableRow>

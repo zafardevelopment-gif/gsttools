@@ -270,6 +270,7 @@ export type BillScanRow = Timestamps & {
   raw_extracted: Json | null;
   ai_error: string | null;
   expense_id: string | null;
+  invoice_id: string | null;
   created_by: string | null;
 }
 

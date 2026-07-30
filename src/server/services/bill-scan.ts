@@ -4,6 +4,8 @@ import { getServerEnv } from "@/lib/env";
 import { rupeesToPaise, paiseToRupees } from "@/lib/money";
 import { logAudit } from "@/server/audit";
 import { createExpense } from "@/server/services/expenses";
+import { createInvoice, type DbClient } from "@/server/services/invoices";
+import { createParty } from "@/server/services/parties";
 import {
   billScanExtractionSchema,
   billScanConfirmSchema,
@@ -11,8 +13,42 @@ import {
   type BillScanConfirmInput,
   type BillScanType,
 } from "@/lib/validation/bill-scan";
-import type { DbClient } from "@/server/services/invoices";
 import type { BillScanRow } from "@/lib/database.types";
+
+/**
+ * Match an existing supplier/both party by name (case-insensitive), or create
+ * one — same "auto-profile on first bill" pattern the WhatsApp billing engine
+ * uses for customers (server/billing/whatsapp-bill.ts). Lets a "purchase"
+ * scan land on the right party ledger without the owner typing it in twice.
+ */
+async function findOrCreateSupplierParty(
+  db: DbClient,
+  tenantId: string,
+  userId: string | null | undefined,
+  vendorName: string | null | undefined,
+): Promise<string | null> {
+  const name = vendorName?.trim();
+  if (!name) return null;
+
+  const { data: existing } = await db
+    .from("aimunim_parties")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .in("type", ["supplier", "both"])
+    .ilike("name", name)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing.id;
+
+  const res = await createParty({
+    db,
+    tenantId,
+    userId,
+    input: { type: "supplier", name, opening_balance: 0, credit_period_days: 0, credit_limit: 0 },
+    source: "bill_scan",
+  });
+  return res.id ?? null;
+}
 
 const BUCKET = "bill-scans";
 
@@ -241,7 +277,12 @@ export async function createBillScan(params: {
 
 export type ConfirmBillScanResult = { row?: BillScanRow; error?: string };
 
-/** Owner reviewed/edited the extracted fields — save and (for purchase/expense) post an expense. */
+/**
+ * Owner reviewed/edited the extracted fields — save, and post the matching
+ * record: 'expense' → aimunim_expenses, 'purchase' → a purchase invoice
+ * (aimunim_invoices, direction='purchase') against a matched/new supplier
+ * party, 'other' → the scan row only, nothing posted.
+ */
 export async function confirmBillScan(params: {
   db: DbClient;
   tenantId: string;
@@ -262,7 +303,9 @@ export async function confirmBillScan(params: {
   if (!existing) return { error: "Bill scan not found." };
 
   let expenseId: string | null = null;
-  if (v.type === "purchase" || v.type === "expense") {
+  let invoiceId: string | null = null;
+
+  if (v.type === "expense") {
     const res = await createExpense({
       db,
       tenantId,
@@ -279,6 +322,40 @@ export async function confirmBillScan(params: {
     });
     if (res.error) return { error: res.error };
     expenseId = res.id ?? null;
+  } else if (v.type === "purchase") {
+    // A purchase bill belongs on the Purchases side (Invoices & Vouchers) and
+    // the supplier's party ledger, not in Expenses — see server/actions/bill-scan.ts.
+    const partyId = await findOrCreateSupplierParty(db, tenantId, userId, v.vendor_name);
+    const res = await createInvoice({
+      db,
+      tenantId,
+      userId,
+      source: "ui",
+      autoShare: false, // don't WhatsApp a "purchase bill" PDF to the supplier
+      input: {
+        direction: "purchase",
+        voucherType: "invoice",
+        invoiceType: "non_gst", // scanned total only — no real GST breakup to trust
+        partyId,
+        invoiceDate: v.bill_date,
+        additionalCharges: 0,
+        roundOff: true,
+        notes: v.notes || undefined,
+        status: "final",
+        lines: [
+          {
+            name: v.category || "Purchase",
+            unit: "PCS",
+            qty: 1,
+            rate: v.amount,
+            taxRate: 0,
+            discountPercent: 0,
+          },
+        ],
+      },
+    });
+    if (res.error) return { error: res.error };
+    invoiceId = res.id ?? null;
   }
 
   const { data: updated, error } = await db
@@ -292,6 +369,7 @@ export async function confirmBillScan(params: {
       category: v.category,
       notes: v.notes || null,
       expense_id: expenseId,
+      invoice_id: invoiceId,
     })
     .eq("id", v.id)
     .eq("tenant_id", tenantId)
@@ -305,7 +383,7 @@ export async function confirmBillScan(params: {
     action: "bill_scan.confirmed",
     entityType: "bill_scan",
     entityId: updated.id,
-    data: { type: v.type, expense_id: expenseId },
+    data: { type: v.type, expense_id: expenseId, invoice_id: invoiceId },
   });
 
   return { row: updated as BillScanRow };

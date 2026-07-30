@@ -278,6 +278,11 @@ export function ScanBillDialog() {
                     value={vendor}
                     onChange={(e) => setVendor(e.target.value)}
                   />
+                  {type === "purchase" && (
+                    <p className="text-xs text-muted-foreground">
+                      Purchase bill banega, aur is naam se supplier party match/create ho jaayegi.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="bill_date">Bill date</Label>
